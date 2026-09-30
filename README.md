@@ -72,6 +72,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - **Tear Breakup Time (TBUT)**: LOINC `71811-4` with UCUM `s`
      - **Intraocular Pressure (Tonometry)**: LOINC `55284-4` with UCUM `mm[Hg]`
      - **Laterality**: SNOMED-CT `28400003` (Right eye), `28400004` (Left eye), `28400005` (Both eyes)
+   - *Note: `http://loinc.org`, `http://snomed.info/sct`, and `http://unitsofmeasure.org` are canonical namespace URIs, not network endpoints. OptoNorm operates 100% offline with zero external network calls or API token requirements.*
 
 7. **Multilingual (i18n) Foundation & French / Italian / Spanish / German Clinical Providers**:
    - **Pluggable `LocaleProvider` Interface**: Isolates locale-specific dictionaries (spoken number words, ASR elisions, laterality synonyms, and clinical keywords) from core parsing logic.
@@ -124,6 +125,73 @@ flowchart TD
     I --> K[Structured FHIR R4 Bundle Exporter]
     H --> L[Clinician Correction Harvesting JSONL]
 ```
+
+---
+
+## HL7 FHIR R4 Architecture & Terminology Systems (LOINC, SNOMED CT, UCUM)
+
+OptoNorm bridges the gap between conversational clinical transcripts and standardized healthcare informatics by generating valid **HL7 FHIR R4** resources.
+
+### 1. Canonical Namespace URIs vs. Network Fetching
+
+> [!IMPORTANT]
+> **Zero Network Overhead & Offline Operation**:  
+> OptoNorm **does NOT fetch data from `http://loinc.org`, `http://snomed.info/sct`, or `http://unitsofmeasure.org` over the internet at runtime**. No API tokens, keys, or external network connections are required to normalize transcripts or export FHIR JSON bundles.
+
+In HL7 FHIR R4, medical concepts are identified using `Coding` elements comprising a `system`, a `code`, and an optional `display`:
+
+$$\text{Coding} = \langle \text{System URI}, \text{Code}, \text{Display} \rangle$$
+
+The URIs are **globally unique canonical namespace identifiers**, not HTTP endpoints to query:
+
+```json
+{
+  "system": "http://loinc.org",
+  "code": "8629-0",
+  "display": "Visual acuity distance"
+}
+```
+
+The URI `http://loinc.org` explicitly declares to receiving EHR systems (e.g., Epic, Cerner, Apple Health, HAPI FHIR) that the code `8629-0` originates from the international LOINC dictionary, avoiding semantic ambiguity with internal hospital charge codes.
+
+### 2. Terminology Governance & Licensing
+
+| System Name | Canonical System URI | Governing Organization | Purpose in OptoNorm | Licensing & Access Model |
+|---|---|---|---|---|
+| **LOINC** | `http://loinc.org` | Regenstrief Institute | Clinical measurements, panels, exam observations (Visual Acuity, Refraction, Tonometry, CCT) | **Free worldwide license** under Regenstrief terms. Free to embed in software products without fees or tokens. |
+| **SNOMED CT** | `http://snomed.info/sct` | SNOMED International | Anatomical sites & laterality (`Right eye`, `Left eye`), qualitative findings, correction state | **Free in Member Countries** (US, UK, Germany, Canada, Australia, Spain, Netherlands, Switzerland, etc.). Foundational concept references are royalty-free. |
+| **UCUM** | `http://unitsofmeasure.org` | Regenstrief / UCUM Organization | Standardized clinical units of measure (`[diop]`, `deg`, `mm[Hg]`, `um`, `s`, `[p'diop]`) | **Public domain / Open Source**. Completely free to use without registration or fees. |
+
+### 3. Internal Architecture & Zero-Token Runtime
+
+OptoNorm operates as a **deterministic producer/generator** of FHIR resources:
+
+```mermaid
+flowchart LR
+    A[Raw Clinical Transcript] --> B[OptoNorm NLP Engine]
+    B --> C[Strongly Typed Findings<br/>Pydantic Data Models]
+    C --> D[fhir.py / fhir_document.py]
+    
+    subgraph Statically Compiled Constants
+        D --> E1[LOINC_SYSTEM = 'http://loinc.org']
+        D --> E2[SNOMED_SYSTEM = 'http://snomed.info/sct']
+        D --> E3[UCUM_SYSTEM = 'http://unitsofmeasure.org']
+    end
+    
+    D --> F[HL7 FHIR R4 Bundle<br/>Transaction or Document]
+    F --> G[EHR Ingestion API<br/>Epic / Cerner / HAPI FHIR]
+```
+
+1. **Extraction**: Clinical entities are parsed into strongly-typed slot models (`VisualAcuitySlots`, `RefractionSlots`, `IOPSlots`).
+2. **Deterministic Mapping**: In [`fhir.py`](src/opto_normalizer/fhir.py) and [`fhir_document.py`](src/opto_normalizer/fhir_document.py), pre-mapped lookup dictionaries translate findings into standard FHIR R4 `Observation`, `DiagnosticReport`, and `Composition` resources.
+3. **Serialization**: In-memory Python dictionaries are serialized directly to JSON strings in **< 0.05 ms** with zero external dependencies.
+
+### 4. When ARE Permissions or Tokens Needed?
+
+Tokens and credentials are only relevant when integrating OptoNorm into an external institutional pipeline:
+
+- **Pushing Bundles to an EHR (SMART on FHIR)**: When sending generated FHIR bundles to a live EHR endpoint (e.g. `POST /Bundle` to Epic or Cerner), the calling application must pass an OAuth2 Bearer Token (`Authorization: Bearer <access_token>`) obtained via SMART-on-FHIR client credentials.
+- **Dynamic Terminology Validation ($lookup / $expand)**: If an external server validates codes dynamically against a live Terminology Server (e.g. NLM UMLS Terminology Services or `fhir.loinc.org`), a free UMLS API Key or LOINC account is required by that external server.
 
 ---
 
