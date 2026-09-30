@@ -2,10 +2,10 @@
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-174%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-223%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.33%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.36%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -90,6 +90,13 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Standard REST Endpoints**: `/v1/normalize` (with granular audit edits and latency telemetry), `/v1/fhir` (HL7 FHIR R4 Bundle generation), `/v1/locales` (supported scales and conventions), and `/v1/health`.
    - **Content Negotiation & Telemetry**: Automatically infers target language from `Accept-Language` headers when not explicitly provided and reports sub-millisecond execution latency in `X-Process-Time-Ms` response headers.
    - **Interactive Documentation**: Auto-generated Swagger UI (`/docs`) and ReDoc (`/redoc`) with pre-configured clinical examples across all supported languages.
+
+9. **Real-Time Streaming & Ambient Scribing (Chunked ASR)**:
+   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds with variable window sizes, token lookahead guards, and multilingual discourse boundaries across English, French, Italian, Spanish, and German without corrupting shorthand across chunk boundaries.
+   - **Symmetrical Bilateral Holdback**: Automatically holds back uncommitted unilateral findings (IOP, Pachymetry, TBUT) across speech pauses, waiting for potential contralateral clauses before committing canonical binocular `OU` shorthand or monocular `OD`/`OS`.
+   - **Bidirectional Offset Tracking (`OffsetTracker`)**: Maintains coordinate mappings between raw incoming ASR stream offsets and normalized shorthand indices across non-destructive span edits, allowing downstream UI components to map audio-aligned timestamps to transformed text.
+   - **Zero-Latency Narrative Flushing**: Immediately emits conversational ambient prose outside clinical slots without buffering delays, preserving doctor-patient dialogue 100% verbatim.
+   - **Native Streaming Transport**: Full support for real-time WebSockets (`/v1/normalize/stream`), Server-Sent Events (`/v1/normalize/sse`), and piped CLI streaming (`optonorm --stream`).
 
 ---
 
@@ -441,6 +448,11 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 
 ## Latest Key Improvements & Technical Highlights
 
+- **Real-Time Streaming & Ambient Scribing Architecture (Dimension 2)**:
+  - Added `StreamingNormalizerBuffer` and `OffsetTracker` in `opto_normalizer.streaming` for low-latency live ASR chunk ingestion.
+  - Implemented symmetrical bilateral holdback across speech pauses (IOP, Pachymetry, TBUT) and decimal fraction lookahead guards.
+  - Added production WebSocket (`/v1/normalize/stream`) and Server-Sent Events (`/v1/normalize/sse`) streaming endpoints.
+  - Added CLI streaming mode (`cat transcript.txt | optonorm --stream`) and Makefile target (`make test-streaming`).
 - **Word-Form Spoken Tonometry & Symmetrical Bilateral Synthesis**:
   - Full parsing for natural-language and spelled-out pressure units (`"twenty-one millimeters of mercury in the right eye and 21 in the left eye"` $\rightarrow$ `IOP: 21 OU mmHg`).
   - Symmetrical readings across contralateral eyes automatically aggregate to `OU` in shorthand, while exporting 2 discrete monocular HL7 FHIR R4 Observations with LOINC `55284-4` (`OD = 21 mmHg`, `OS = 21 mmHg`).
@@ -449,9 +461,9 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **174 passing tests** covering multi-modal clinical encounters across English, French, Italian, Spanish, and German (diabetic retinopathy, contact lens fittings, convergence therapy, cataracts with glare, glaucoma suspect workups, and pre-op evaluations).
+  - Test suite expanded to **223 passing tests** (including 48 streaming tests) covering real-world simulation across 19 encounter transcripts, split tokens, bilateral pauses, and multi-modal clinical encounters across English, French, Italian, Spanish, and German.
 - **Core Engine Rebranding to OptoNorm**:
-  - Standardized as package `optonorm==0.10.0` with dynamic path resolution across all harvesting and benchmarking pipelines.
+  - Standardized as package `optonorm==0.11.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
 ---
 
@@ -511,8 +523,13 @@ optonorm/
 │       ├── api/                    # Production FastAPI serving & plug-and-play router
 │       │   ├── __init__.py         # Public exports (create_app, optonorm_router, get_optonorm_router)
 │       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware
-│       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health
+│       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   └── schemas.py          # Pydantic v2 request/response schemas with clinical examples
+│       ├── streaming/              # Dimension 2: Real-Time Streaming & Ambient Scribing (Chunked ASR)
+│       │   ├── __init__.py         # Public streaming exports (StreamingNormalizerBuffer, OffsetTracker, StreamingChunk, StreamingEvent)
+│       │   ├── buffer.py           # Sliding window buffer with discourse boundaries, bilateral holdback & zero-latency flushing
+│       │   ├── models.py           # Streaming data models (StreamingEventType, StreamingChunk, StreamingEvent)
+│       │   └── offset_tracker.py   # Bidirectional character offset interval tree for stream-to-normalized coordinate mapping
 │       ├── grammars/
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
@@ -542,7 +559,8 @@ optonorm/
 │           └── phrases_de.py       # Fixed clinical phrase entries (German)
 ├── tests/
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
-│   ├── test_cli.py                 # CLI, file I/O, FHIR export, demo, and main.py forwarding tests
+│   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
+│   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
 │   ├── test_fhir.py                # FHIR R4 Bundle and Observation tests
 │   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
 │   ├── test_guards.py              # Entailment and range validation unit tests
@@ -553,13 +571,16 @@ optonorm/
 │   ├── test_i18n_de.py             # German locale unit and transcript integration tests
 │   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
+│   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
 │   ├── test_pipeline.py            # End-to-end normalization pipeline tests
 │   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen)
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
 │   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
 │   ├── test_real_transcript_de.py  # End-to-end real German clinical transcript & FHIR export tests
-│   └── test_residue_and_fallback.py# Residue detection and model fallback tests
+│   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
+│   ├── test_streaming.py           # Comprehensive chunked simulation suite (split tokens, bilateral pauses, 19 transcripts)
+│   └── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
 ├── Dockerfile                      # Multi-stage unprivileged production container
 ├── docker-compose.yml              # Single-command Docker Compose stack
 ├── .dockerignore                   # Build artifact exclusions
@@ -594,14 +615,15 @@ uv sync
 A comprehensive [Makefile](Makefile) is included to automate all quality assurance, testing, benchmarking, and serving tasks:
 
 ```bash
-make help          # Display interactive menu with all available targets
-make check         # Run full code quality pipeline (ruff check + format check)
-make test          # Run test suite with pytest
-make benchmark     # Run gold benchmark (accuracy, hallucinations, latency)
-make dev           # Start development FastAPI server with auto-reload
-make normalize     # Test clinical normalization via CLI
-make fhir-doc      # Test FHIR R4 consultation document bundle export
-make clean         # Remove cache and build artifacts
+make help           # Display interactive menu with all available targets
+make check          # Run full code quality pipeline (ruff check + format check)
+make test           # Run complete test suite with pytest (223 tests)
+make test-streaming # Run real-time streaming & ambient scribing test suite (48 tests)
+make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
+make dev            # Start development FastAPI server with auto-reload
+make normalize      # Test clinical normalization via CLI
+make fhir-doc       # Test FHIR R4 consultation document bundle export
+make clean          # Remove cache and build artifacts
 ```
 
 ### 2. Run the Normalizer CLI (`main.py` or `optonorm`)
@@ -628,6 +650,9 @@ uv run main.py -i visit.txt -o normalized.txt --output-fhir bundle.json --fhir-f
 
 # Pipe transcript from another command or file
 cat transcript.txt | uv run main.py
+
+# Real-time streaming mode over pipe or live standard input (Dimension 2)
+cat live_stream.txt | uv run optonorm --stream --locale en
 
 # Run built-in clinical demonstration
 uv run main.py --demo
@@ -804,6 +829,59 @@ Lists supported language codes, clinical scales, and default conventions.
 
 Health probe reporting uptime status, version, and loaded locales.
 
+#### 5. `WebSocket /v1/normalize/stream`
+
+Bi-directional low-latency WebSocket endpoint for real-time speech-to-text chunked streaming and ambient scribing. Ideal for direct integration with browser microphones, ASR providers (Whisper, Deepgram), or real-time clinical scribing UIs.
+
+**Query Parameters**:
+- `locale`: Optional language (`en`, `fr`, `it`, `es`, `de`, or `auto`).
+- `convention`: Output shorthand convention (`international` or `localized`).
+- `patient_id`: Patient identifier for discrete FHIR observation generation.
+
+**Message Protocol (Client -> Server)**:
+```json
+{
+  "chunk": "Visual acuity measured 2020 right eye",
+  "is_final": true,
+  "action": "feed"
+}
+```
+Available actions:
+- `feed`: Ingests an incoming audio/transcript chunk into the sliding window buffer.
+- `flush`: Forces flushing of all held-back buffers and pending findings (e.g. at end of exam).
+- `reset`: Clears the buffer and offset tracker for a new patient encounter.
+
+**Event Protocol (Server -> Client)**:
+```json
+{
+  "event_type": "finding_committed",
+  "emitted_text": "VA OD 20/20",
+  "original_span": "2020 right eye",
+  "start": 23,
+  "end": 37,
+  "finding_type": "visual_acuity",
+  "slots": {
+    "distance_numerator": 20,
+    "distance_denominator": 20.0,
+    "laterality": "OD"
+  },
+  "fhir_observations": [...]
+}
+```
+
+#### 6. `GET /v1/normalize/sse`
+
+Server-Sent Events (SSE) endpoint providing unidirectional HTTP streaming of normalization events from continuous speech streams.
+
+**Query Parameters**:
+- `transcript`: URL-encoded transcript stream (or periodic query chunks).
+- `locale`: Optional language (`en`, `fr`, `it`, `es`, `de`, `auto`).
+- `convention`: `international` (default) or `localized`.
+
+```bash
+curl -N "http://localhost:8000/v1/normalize/sse?transcript=visual%20acuity%202020%20right%20eye.%20IOP%2014%20mmHg%20left%20eye."
+```
+
 ---
 
 ## Containerized Deployment (Docker & Compose)
@@ -865,6 +943,25 @@ doc_bundle = export_to_fhir_document_bundle(
     practitioner_id="dr-smith",
 )
 print(f"FHIR Document Bundle entries: {len(doc_bundle['entry'])}")
+
+# 5. Real-Time Streaming & Ambient Scribing (Chunked ASR)
+from opto_normalizer.streaming import StreamingNormalizerBuffer
+
+buffer = StreamingNormalizerBuffer(locale="en", patient_id="patient-12345")
+
+# Feed live ASR speech chunks incrementally as they arrive
+events_1 = buffer.feed("The visual acuity is 2020 ")
+events_2 = buffer.feed("right eye. ")  # Emits finding_committed: 'VA OD 20/20'
+
+# Clinician pauses between eyes (bilateral holdback prevents premature monocular commit)
+events_3 = buffer.feed("Tonometry was 14 right eye ")  # held in buffer
+events_4 = buffer.feed("and 14 left eye. ")  # Bilateral symmetry detected! Emits 'IOP: 14 OU mmHg'
+
+# End of encounter flush
+final_events = buffer.flush()
+for ev in final_events:
+    if ev.event_type.value == "finding_committed":
+        print(f"[{ev.finding_type.value}] {ev.emitted_text}")
 ```
 
 ---
