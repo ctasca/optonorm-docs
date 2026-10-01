@@ -2,10 +2,10 @@
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-241%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-263%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.35%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.47%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -34,6 +34,10 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - Ultrasound Central Corneal Thickness (CCT): Standardizes micrometer measurements (`CCT: 515 OD, 520 OS µm`, `CCT: 540 OU µm`).
      - Tear Film Breakup Time: Fluorescein sodium breakup times in seconds (`TBUT: 4s OD, 3s OS`, `TBUT: 5s OU`).
    - **Tonometry (IOP)**: Goldmann Applanation Tonometry (GAT), Tonopen, iCare, and Non-Contact Air Puff (NCT) (`IOP: 14 OD, 15 OS mmHg`, `IOP: 21 OU mmHg`). Parses spoken "brief puff" and natural-language tonometry pressure readings with digit or word-form units (e.g., _"The pressure is twenty-one millimeters of mercury in the right eye and 21 in the left eye"_ $\rightarrow$ canonical clinical shorthand `IOP: 21 OU mmHg`, _"18mm of mercury right eye and 19 left eye"_ $\rightarrow$ `IOP: 18 OD, 19 OS mmHg`). Symmetrical bilateral pressures automatically resolve to `OU`. Generates discrete monocular HL7 FHIR R4 Observations with LOINC `55284-4` (_Intraocular pressure_).
+   - **Dynamic Cup-to-Disc (C/D) Ratio**: Scalar symmetric (`C/D 0.3 OU`), monocular asymmetric (`C/D: 0.3 OD, 0.7 OS`), and biaxial horizontal/vertical ratios (`C/D OD 0.4H/0.45V`, `C/D OS 0.5H/0.7V (inf notch)`) with neuroretinal rim notching notes (`inf notch`, `sup notch`) and automated clinical glaucoma suspect interpretations across all 5 languages. LOINC `70949-3`.
+   - **Pupillary Examination & RAPD**: Standard findings (`PERRLA`, `PERRL (-) RAPD`), measured dynamic light reflex diameters / anisocoria (`Pupils: 4->2mm OD, 3->2mm OS`, `Pupils: 4->2mm OU`), static diameters (`Pupils: 5mm OD, 3mm OS`), and graded Relative Afferent Pupillary Defects (`2+ RAPD OS`, `1+ RAPD OD`, `trace RAPD OS`). LOINC `80315-5`, `80313-0`, and `76504-0`.
+   - **Slit Lamp Severity & Biomicroscopy Grading**: Cataract opacities (LOCS III: `Lens: 2+ NS, 1+ PSC OU`, `Lens: trace NS OU`, `Lens: 2+ NS, 1+ Cort OD`), anterior chamber cells & flare (SUN standardization: `AC: 1+ cells, trace flare`), and corneal superficial punctate keratitis (`Cornea: 2+ SPK inf OU`, `Cornea: trace SPK`). Discrete FHIR observations with SNOMED CT `414646002` (*Nuclear sclerosis*), LOINC `70950-1` (*Flare anterior chamber of eye*), and SNOMED CT `231872005` (*Superficial punctate keratitis*).
+   - **Strabismus & Binocular Alignment**: Cover test distance and near phorias (`CT: dist 4Δ EP, near 8Δ EP`, `CT: dist 4Δ XP, near 10Δ XP`), monocular and alternating tropias (`15Δ LXT`, `20Δ RET`, `10Δ XT`), and orthophoria (`Ortho dist & near`, `Ortho dist`, `Ortho near`, `Ortho`). Discrete FHIR observation with LOINC `70951-9` (*Ocular alignment*).
    - **Clinical Grading & Modifiers**: Standardizes clinical severity grading (`one plus` $\rightarrow$ `1+`, `two plus` $\rightarrow$ `2+`, `three plus` $\rightarrow$ `3+`, `four plus` $\rightarrow$ `4+`, `grade one` $\rightarrow$ `grade 1`).
    - **Fixed-Phrase Lexicon**: Maps colloquial findings to canonical acronyms (`PERRLA`, `PERRL (-) RAPD`, `EOMI`, `DFE`, `C/D 0.3 OU`, `AC: D&Q OU, no c/f`, `Lens: trace NS OU`, `Cornea: clear OU`).
 
@@ -43,7 +47,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - If even a single digit cannot be mathematically derived from the source tokens, the edit is flagged or aborted. Hallucination rate: **0.00%**.
 
 3. **Physiological & Clinical Boundary Validation**:
-   - Validates diopter increments (must be in 0.25 D steps), cylinder sign conventions, astigmatic axes ($1^\circ$ to $180^\circ$), physiological intraocular pressure ranges (4–70 mmHg), valid Snellen denominators (including metric 6m denominators $4, 5, 6, 7.5, 9, 12, 15, 60$ and low-vision $300$ and $400$), central corneal thickness (300–850 µm), and TBUT (1–60 s).
+   - Validates diopter increments (must be in 0.25 D steps), cylinder sign conventions, astigmatic axes ($1^\circ$ to $180^\circ$), physiological intraocular pressure ranges (4–70 mmHg), valid Snellen denominators (including metric 6m denominators $4, 5, 6, 7.5, 9, 12, 15, 60$ and low-vision $300$ and $400$), central corneal thickness (300–850 µm), TBUT (1–60 s), optic nerve cup-to-disc ratios (0.0–1.0), and pupillary diameters (1.0–9.0 mm).
    - Locale-specific acuity boundary guards enforce physiological limits for Monoyer decimal scale (`1/20`, `1/10` to `10/10`), Parinaud French near acuity (`P1.5` to `P14`), Jaeger Italian/Spanish near acuity (`J1` to `J7`, with `+`/`-` modifiers), and German DIN 58220 decimal Visus (`1,0` to `0,05`), Nieden (`N1` to `N8`), and Birkhäuser (`B1` to `B6`) near reading scales.
 
 4. **Speech-to-Text (ASR) Acoustic Artifact Resilience**:
@@ -524,16 +528,20 @@ optonorm/
 │       │   ├── models.py           # Streaming data models (StreamingEventType, StreamingChunk, StreamingEvent)
 │       │   └── offset_tracker.py   # Bidirectional character offset interval tree for stream-to-normalized coordinate mapping
 │       ├── grammars/
+│       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
+│       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
+│       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
 │       │   ├── keratometry.py      # Corneal Keratometry (K-readings: flat/steep D @ axis) parser
 │       │   ├── prism.py            # Horizontal (BI/BO) and vertical (BU/BD) prism diopter parser
+│       │   ├── pupils.py           # Pupillary exam, dynamic diameters, anisocoria & graded RAPD parser
 │       │   ├── refraction.py       # Refraction, cylinder stutter, and add power parser
 │       │   ├── templates.py        # Abstract Parametric Regex Templates (universal clinical syntax topology)
 │       │   └── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
 │       ├── guards/
 │       │   ├── entailment.py       # Post-hoc numeric entailment verification guard
-│       │   └── ranges.py           # Physiological optometric range bounds (0.25D, 1-180°, CCT, TBUT, IOP)
+│       │   └── ranges.py           # Physiological optometric range bounds (0.25D, 1-180°, CCT, TBUT, IOP, C/D, pupils, alignment)
 │       ├── i18n/
 │       │   ├── __init__.py         # Locale & ShorthandConvention enums, provider registry
 │       │   ├── detector.py         # Zero-dependency clinical language detection heuristics
@@ -551,11 +559,14 @@ optonorm/
 │           ├── phrases_es.py       # Fixed clinical phrase entries (Spanish)
 │           └── phrases_de.py       # Fixed clinical phrase entries (German)
 ├── tests/
+│   ├── test_alignment.py           # Unit tests for strabismus and binocular alignment grammar
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
 │   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
+│   ├── test_cd_ratio.py            # Unit tests for dynamic C/D ratio grammar and FHIR mapping
 │   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
 │   ├── test_fhir.py                # FHIR R4 Bundle and Observation tests
 │   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
+│   ├── test_grading.py             # Unit tests for biomicroscopy and slit lamp severity grading
 │   ├── test_guards.py              # Entailment and range validation unit tests
 │   ├── test_i18n_foundation.py     # Language detection, provider resolution, templates compilation tests
 │   ├── test_i18n_fr.py             # French locale unit and transcript integration tests
@@ -566,7 +577,8 @@ optonorm/
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
 │   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
 │   ├── test_pipeline.py            # End-to-end normalization pipeline tests
-│   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen)
+│   ├── test_pupils.py              # Unit tests for pupillary exam and graded RAPD grammar
+│   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen, Fatima, Ryan, Peter)
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
 │   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
