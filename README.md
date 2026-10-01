@@ -2,7 +2,7 @@
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-223%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-241%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Latency](https://img.shields.io/badge/mean%20latency-0.35%20ms-orange.svg)]()
@@ -461,7 +461,7 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **223 passing tests** (including 48 streaming tests) covering real-world simulation across 19 encounter transcripts, split tokens, bilateral pauses, and multi-modal clinical encounters across English, French, Italian, Spanish, and German.
+  - Test suite expanded to **241 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
 - **Core Engine Rebranding to OptoNorm**:
   - Standardized as package `optonorm==0.11.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
@@ -482,35 +482,21 @@ optonorm/
 │   ├── vocabulary_spec_it.json     # Italian clinical shorthand schema & canonical slot specifications
 │   ├── vocabulary_spec_es.json     # Spanish clinical shorthand schema & canonical slot specifications
 │   ├── vocabulary_spec_de.json     # German clinical shorthand schema & canonical slot specifications
+│   ├── noisy_asr_benchmark.json    # 155-item adversarial noisy ASR benchmark suite (negative controls & acoustic noise across 5 languages)
 │   └── transcripts/
 │       ├── edge_cases.json         # Curated clinical transcripts covering novel domains (Prism, Keratometry, CCT, TBUT - English)
 │       ├── edge_cases_fr.json      # Curated clinical edge-case transcripts (French)
 │       ├── edge_cases_it.json      # Curated clinical edge-case transcripts (Italian)
 │       ├── edge_cases_es.json      # Curated clinical edge-case transcripts (Spanish)
 │       ├── edge_cases_de.json      # Curated clinical edge-case transcripts (German)
-│       ├── visit_en_cataract.json  # English cataract & keratometry encounters (Harold, Ryan)
-│       ├── visit_en_comprehensive.json # English comprehensive encounters (Fatima, Clara, Anna, Layla)
-│       ├── visit_en_contact_lens.json # English contact lens & TBUT encounters (Maya, Julian, Counseling)
-│       ├── visit_en_glaucoma.json  # English glaucoma suspect & pachymetry encounters (Eleanor, Peter)
-│       ├── visit_en_pediatric_strabismus.json # English pediatric & binocular vision encounters (Samuel, Nathan)
-│       ├── visit_en_refraction.json # English refraction, stutter resilience & add counseling encounters
-│       ├── visit_fr_cataract.json  # French cataract pre-op transcript (Keratometry, low-vision Monoyer/Parinaud)
-│       ├── visit_fr_dry_eye.json   # French dry eye & contact lens transcript (TBUT, CCT, slit lamp)
-│       ├── visit_fr_glaucoma.json  # French glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
-│       ├── visit_fr_myopia.json    # French clinical encounter transcript (Myopia & Presbyopia)
-│       ├── visit_it_cataract.json  # Italian cataract pre-op transcript (Keratometry, Decimi, Jaeger, NS grading)
-│       ├── visit_it_dry_eye.json   # Italian dry eye & contact lens transcript (TBUT, CCT, slit lamp)
-│       ├── visit_it_glaucoma.json  # Italian glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
-│       ├── visit_it_myopia.json    # Italian clinical encounter transcript (Myopia, Astigmatism, Presbyopia)
-│       ├── visit_it_refraction.json # Italian subjective refraction & tonometry encounter
-│       ├── visit_es_cataract.json  # Spanish cataract pre-op transcript (Keratometry, Décimas, Jaeger, NS grading)
-│       ├── visit_es_dry_eye.json   # Spanish dry eye & contact lens transcript (TBUT, CCT, slit lamp)
-│       ├── visit_es_glaucoma.json  # Spanish glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
-│       ├── visit_es_myopia.json    # Spanish clinical encounter transcript (Myopia, Astigmatism, Presbyopia)
-│       ├── visit_de_cataract.json  # German cataract evaluation transcript (DIN 58220 decimal Visus, Nieden, CCT, DFE)
-│       ├── visit_de_myopia.json    # German clinical encounter transcript (Myopia, Astigmatism, Presbyopia)
-│       ├── visit_de_glaucoma.json  # German glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
-│       └── visit_de_dry_eye.json   # German dry eye & contact lens transcript (TBUT, CCT, slit lamp)
+│       ├── visit_<lang>_cataract.json            # Cataract evaluation, LOCS III grading & keratometry (en, de, fr, es, it)
+│       ├── visit_<lang>_glaucoma.json            # Glaucoma suspect, diurnal tonometry & pachymetry (en, de, fr, es, it)
+│       ├── visit_<lang>_dry_eye.json             # Dry eye disease, TBUT, Schirmer & contact lens intolerance (en, de, fr, es, it)
+│       ├── visit_<lang>_myopia.json              # Myopic progression, subjective fine-tuning & fundoscopy (en, de, fr, es, it)
+│       ├── visit_<lang>_refraction.json          # Phoropter dialogue, astigmatic cross-cylinder & reading add (en, de, fr, es, it)
+│       ├── visit_<lang>_pediatric_strabismus.json# Pediatric optometry, strabismus cover test & prism correction (en, de, fr, es, it)
+│       ├── visit_<lang>_contact_lens.json        # Keratoconus, scleral lens fitting & corneal curvature (en, de, fr, es, it)
+│       └── visit_<lang>_comprehensive.json       # Comprehensive diabetic eye exam & presbyopia review (en, de, fr, es, it)
 ├── scripts/
 │   ├── benchmark_eval.py           # Quantitative accuracy, hallucination, and latency benchmark
 │   ├── generate_gold_set.py        # Gold benchmark dataset generator
