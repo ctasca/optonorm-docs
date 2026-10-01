@@ -1,11 +1,11 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
-[![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
+[![CI](https://github.com/ctasca/optonorm/actions)
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-263%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-272%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.47%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.51%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -50,13 +50,16 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - Validates diopter increments (must be in 0.25 D steps), cylinder sign conventions, astigmatic axes ($1^\circ$ to $180^\circ$), physiological intraocular pressure ranges (4–70 mmHg), valid Snellen denominators (including metric 6m denominators $4, 5, 6, 7.5, 9, 12, 15, 60$ and low-vision $300$ and $400$), central corneal thickness (300–850 µm), TBUT (1–60 s), optic nerve cup-to-disc ratios (0.0–1.0), and pupillary diameters (1.0–9.0 mm).
    - Locale-specific acuity boundary guards enforce physiological limits for Monoyer decimal scale (`1/20`, `1/10` to `10/10`), Parinaud French near acuity (`P1.5` to `P14`), Jaeger Italian/Spanish near acuity (`J1` to `J7`, with `+`/`-` modifiers), and German DIN 58220 decimal Visus (`1,0` to `0,05`), Nieden (`N1` to `N8`), and Birkhäuser (`B1` to `B6`) near reading scales.
 
-4. **Speech-to-Text (ASR) Acoustic Artifact Resilience**:
-   - Automatically repairs typical acoustic transcription anomalies:
+4. **Speech-to-Text (ASR) Acoustic Artifact Resilience & Speech Dysfluency Preprocessor**:
+   - **Self-Correction Engine (`self_correction.py`)**: Detects spoken reset and retraction operators across 5 languages (English: *"no wait"*, *"sorry"*, *"make that"*, *"scratch that"*, *"correction"*; French: *"pardon"*, *"non attendez"*, *"je voulais dire"*; German: *"Entschuldigung"*, *"nein warte"*, *"Korrektur"*, *"besser gesagt"*; Italian: *"scusa"*, *"no aspetta"*, *"volevo dire"*; Spanish: *"perdón"*, *"no espera"*, *"quise decir"*). When a clinician retracts a finding mid-utterance (e.g. `[VA] + "no wait" + [VA]`), OptoNorm supersedes the earlier span, marking it as discarded speech while preserving the intended clinical measurement.
+   - **ASR Number-Punctuation Re-Stitcher (`punctuation_repair.py`)**: Repairs punctuation fractures inserted by acoustic pause detection in commercial ASR models (e.g., `"axis 1. 80"` $\rightarrow$ `"axis 180"`, `"minus 2. 50"` $\rightarrow$ `"minus 2.50"`, `"14. mmHg"` $\rightarrow$ `"14 mmHg"`).
+   - **Stutter & Repetition Collapser (`repetition.py`)**: Collapses immediately duplicated clinical keywords, signs, laterality, and modalities (e.g., `"minus minus"`, `"sphere sphere"`, `"cylinder cylinder"`, `"right eye right eye"`).
+   - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
+   - **Phonetic & Acoustic Artifact Repairs**:
      - Phonetic decimals: `"minus OH .25 cylinder"` $\rightarrow$ `-0.25 cylinder`
      - Concatenated 4-digit Snellen numbers: `"2020"` $\rightarrow$ `20/20`, `"2400"` $\rightarrow$ `20/400`, `"2300"` $\rightarrow$ `20/300`, `"2200"` $\rightarrow$ `20/200`, `"2100"` $\rightarrow$ `20/100`, `"2080"` $\rightarrow$ `20/80`
      - Hybrid compound spoken numbers: ASR digit-word hybrids like `"at 100 sixty-eight degrees"` or `"100 68 degrees"` $\rightarrow$ `axis 168`
      - Spoken degree symbols: `"at 175°"` $\rightarrow$ `axis 175`, `"at 10°"` $\rightarrow$ `axis 010`
-     - Punctuation & stutter dysfluencies: Dysfluencies interrupted by punctuation or repetition (e.g., `"-0.50 cylinder. Cylinder at 10°"` $\rightarrow$ `-0.50 cylinder at 10°`, `"-0.75 cylinder Cylinder at 85°"` $\rightarrow$ `OS -0.75 x 085`, `"sphere sphere, sphere sphere"`)
      - Phonetic acoustic near-add variants: Conversational phrasing (`"frenir"`, `"frenier"`, `"for near"`)
      - Spoken pressure units & word numbers: `"15 mm of mercury"` $\rightarrow$ `15 mmHg`, `"twenty-one millimeters of mercury"` $\rightarrow$ `21 mmHg`
 
@@ -75,7 +78,12 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - **Corneal Pachymetry (CCT)**: LOINC `71813-0` with UCUM `um`
      - **Tear Breakup Time (TBUT)**: LOINC `71811-4` with UCUM `s`
      - **Intraocular Pressure (Tonometry)**: LOINC `55284-4` with UCUM `mm[Hg]`
+     - **Cup-to-Disc (C/D) Ratio**: LOINC `70949-3`
+     - **Pupillary Reflex & Diameters**: LOINC `80315-5` (Pupillary reflex), LOINC `80313-0` (Pupil diameter in `mm`), LOINC `76504-0` (RAPD)
+     - **Biomicroscopy & Cataract Grading**: SNOMED-CT `414646002` (Nuclear sclerosis), LOINC `70950-1` (AC flare), SNOMED-CT `231872005` (SPK)
+     - **Strabismus & Binocular Alignment**: LOINC `70951-9` with UCUM `[p'diop]`
      - **Laterality**: SNOMED-CT `28400003` (Right eye), `28400004` (Left eye), `28400005` (Both eyes)
+     - **Diagnostic Document Packaging**: LOINC `11528-7` (DiagnosticReport) packaged into FHIR Composition and Consultation Document Bundles
    - *Note: `http://loinc.org`, `http://snomed.info/sct`, and `http://unitsofmeasure.org` are canonical namespace URIs, not network endpoints. OptoNorm operates 100% offline with zero external network calls or API token requirements.*
 
 7. **Multilingual (i18n) Foundation & French / Italian / Spanish / German Clinical Providers**:
@@ -108,32 +116,38 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
 
 ```mermaid
 flowchart TD
-    A[Raw ASR Transcript] --> B[Number Words & ASR Artifact Normalizer]
-    B --> C[Candidate Span Extractors]
+    A[Raw ASR Transcript] --> B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
+    B --> PRE[Acoustic & Speech Dysfluency Preprocessor<br/>Self-Correction Engine · Punctuation Re-Stitcher · Stutter Collapser]
+    PRE --> C[Candidate Span Extractors]
+    PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
 
     subgraph Grammars & Lexicon
-        C --> D1[Visual Acuity Grammar<br/>Snellen, Metric 6m, Pinhole]
-        C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add]
-        C --> D3[Tonometry / IOP Grammar<br/>GAT, NCT, iCare]
+        C --> D1[Visual Acuity Grammar<br/>Snellen, Metric 6m, Pinhole, Decimals]
+        C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add, Rapid Sequences]
+        C --> D3[Tonometry / IOP Grammar<br/>GAT, NCT, iCare, Spoken Units]
         C --> D4[Prism Grammar<br/>Δ BI, BO, BU, BD]
         C --> D5[Keratometry Grammar<br/>K Flat, Steep, Cyl, Axis]
         C --> D6[Cornea Grammar<br/>CCT in µm, TBUT in s]
-        C --> D7[Fixed Clinical Phrase Lexicon]
+        C --> D7[Dynamic C/D Ratio Grammar<br/>Scalar, Asymmetric, Biaxial, Notching]
+        C --> D8[Pupil & RAPD Grammar<br/>Diameters, Light Reflex, Graded RAPD]
+        C --> D9[Slit Lamp Grading Grammar<br/>LOCS III Cataract, SUN AC Cells/Flare, SPK]
+        C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Phorias, Tropias, Ortho]
+        C --> D11[Fixed Clinical Phrase Lexicon]
     end
 
-    D1 & D2 & D3 & D4 & D5 & D6 & D7 --> E[Post-Hoc Verification Pipeline]
+    D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 --> E[Post-Hoc Verification Pipeline]
 
     subgraph Safety Guards
-        E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers]
-        E --> F2[Physiological Range Guard<br/>0.25D, 1-180 Axis, CCT, TBUT]
+        E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
+        E --> F2[Physiological Range Guard<br/>0.25D, 1-180° Axis, CCT, TBUT, C/D, Pupils, Grading, Δ]
     end
 
-    F1 & F2 --> G[Conflict & Overlap Resolver]
+    F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
     G --> H[Residue Detection & Optional SLM Escalation]
     H --> I[Reversible In-Place Span Replacement Engine]
 
     I --> J[Normalized EHR Clinical Text]
-    I --> K[Structured FHIR R4 Bundle Exporter]
+    I --> K[Structured FHIR R4 Bundle Exporter<br/>LOINC, SNOMED CT, UCUM, DiagnosticReport]
     H --> L[Clinician Correction Harvesting JSONL]
 ```
 
@@ -193,7 +207,7 @@ flowchart LR
     F --> G[EHR Ingestion API<br/>Epic / Cerner / HAPI FHIR]
 ```
 
-1. **Extraction**: Clinical entities are parsed into strongly-typed slot models (`VisualAcuitySlots`, `RefractionSlots`, `IOPSlots`).
+1. **Extraction**: Clinical entities are parsed into strongly-typed slot models (`VisualAcuitySlots`, `RefractionSlots`, `IOPSlots`, `PrismSlots`, `KeratometrySlots`, `PachymetrySlots`, `TBUTSlots`, `CDRatioSlots`, `PupilSlots`, `GradingSlots`, `AlignmentSlots`).
 2. **Deterministic Mapping**: In [`fhir.py`](src/opto_normalizer/fhir.py) and [`fhir_document.py`](src/opto_normalizer/fhir_document.py), pre-mapped lookup dictionaries translate findings into standard FHIR R4 `Observation`, `DiagnosticReport`, and `Composition` resources.
 3. **Serialization**: In-memory Python dictionaries are serialized directly to JSON strings in **< 0.05 ms** with zero external dependencies.
 
@@ -221,7 +235,7 @@ Evaluated on the 682-utterance Multilingual Gold Evaluation Benchmark across Eng
 | **Corneal Pachymetry (CCT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.31 ms    |
 | **Tear Breakup Time (TBUT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.30 ms    |
 | **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.15 ms    |
-| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.38 ms**  |
+| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.51 ms**  |
 
 ---
 
@@ -522,6 +536,12 @@ optonorm/
 │       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   └── schemas.py          # Pydantic v2 request/response schemas with clinical examples
+│       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor
+│       │   ├── __init__.py         # Pipeline entrypoint (preprocess_transcript)
+│       │   ├── tracker.py          # SpanCoordinateMapper non-destructive offset tracker
+│       │   ├── punctuation_repair.py # ASR pause punctuation re-stitcher (split decimals, axes, units)
+│       │   ├── repetition.py       # Clinical keyword stutter & repetition collapser
+│       │   └── self_correction.py  # Multilingual spoken self-correction & reset operator engine
 │       ├── streaming/              # Dimension 2: Real-Time Streaming & Ambient Scribing (Chunked ASR)
 │       │   ├── __init__.py         # Public streaming exports (StreamingNormalizerBuffer, OffsetTracker, StreamingChunk, StreamingEvent)
 │       │   ├── buffer.py           # Sliding window buffer with discourse boundaries, bilateral holdback & zero-latency flushing
@@ -577,6 +597,7 @@ optonorm/
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
 │   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
 │   ├── test_pipeline.py            # End-to-end normalization pipeline tests
+│   ├── test_preprocessors.py       # Unit tests for self-correction, punctuation repair & stutter collapser
 │   ├── test_pupils.py              # Unit tests for pupillary exam and graded RAPD grammar
 │   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen, Fatima, Ryan, Peter)
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
