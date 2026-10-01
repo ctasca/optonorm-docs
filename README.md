@@ -5,7 +5,7 @@
 [![Tests](https://img.shields.io/badge/tests-223%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.36%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.35%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -488,6 +488,12 @@ optonorm/
 │       ├── edge_cases_it.json      # Curated clinical edge-case transcripts (Italian)
 │       ├── edge_cases_es.json      # Curated clinical edge-case transcripts (Spanish)
 │       ├── edge_cases_de.json      # Curated clinical edge-case transcripts (German)
+│       ├── visit_en_cataract.json  # English cataract & keratometry encounters (Harold, Ryan)
+│       ├── visit_en_comprehensive.json # English comprehensive encounters (Fatima, Clara, Anna, Layla)
+│       ├── visit_en_contact_lens.json # English contact lens & TBUT encounters (Maya, Julian, Counseling)
+│       ├── visit_en_glaucoma.json  # English glaucoma suspect & pachymetry encounters (Eleanor, Peter)
+│       ├── visit_en_pediatric_strabismus.json # English pediatric & binocular vision encounters (Samuel, Nathan)
+│       ├── visit_en_refraction.json # English refraction, stutter resilience & add counseling encounters
 │       ├── visit_fr_cataract.json  # French cataract pre-op transcript (Keratometry, low-vision Monoyer/Parinaud)
 │       ├── visit_fr_dry_eye.json   # French dry eye & contact lens transcript (TBUT, CCT, slit lamp)
 │       ├── visit_fr_glaucoma.json  # French glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
@@ -496,6 +502,7 @@ optonorm/
 │       ├── visit_it_dry_eye.json   # Italian dry eye & contact lens transcript (TBUT, CCT, slit lamp)
 │       ├── visit_it_glaucoma.json  # Italian glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
 │       ├── visit_it_myopia.json    # Italian clinical encounter transcript (Myopia, Astigmatism, Presbyopia)
+│       ├── visit_it_refraction.json # Italian subjective refraction & tonometry encounter
 │       ├── visit_es_cataract.json  # Spanish cataract pre-op transcript (Keratometry, Décimas, Jaeger, NS grading)
 │       ├── visit_es_dry_eye.json   # Spanish dry eye & contact lens transcript (TBUT, CCT, slit lamp)
 │       ├── visit_es_glaucoma.json  # Spanish glaucoma suspect transcript (Prism, Tonometry, CCT, DFE)
