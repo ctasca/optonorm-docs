@@ -2,10 +2,10 @@
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/tests-272%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-275%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.51%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.54%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -235,7 +235,20 @@ Evaluated on the 682-utterance Multilingual Gold Evaluation Benchmark across Eng
 | **Corneal Pachymetry (CCT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.31 ms    |
 | **Tear Breakup Time (TBUT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.30 ms    |
 | **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.15 ms    |
-| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.51 ms**  |
+| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.54 ms**  |
+
+### Slot-Level Information Extraction & Verbatim Integrity Metrics
+
+Evaluated across all 1,266 individual clinical slot values extracted across the 682 utterances:
+
+| Quality Dimension | Metric Value | Quality Gate | Status |
+|---|:---:|:---:|:---:|
+| **Slot-Level Precision** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
+| **Slot-Level Recall** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
+| **Slot-Level F1-Score** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
+| **Verbatim Narrative Corruption Rate** | **0.0000%** (0 chars altered) | $0.00\%$ | ✅ PASS |
+| **Invented Numbers (Hallucination)** | **0.00%** (0 fabricated numbers) | $0.00\%$ | ✅ PASS |
+| **Negative Control False Replacements** | **0.00%** (0 / 52) | $0.00\%$ | ✅ PASS |
 
 ---
 
@@ -515,8 +528,10 @@ optonorm/
 │       ├── visit_<lang>_pediatric_strabismus.json# Pediatric optometry, strabismus cover test & prism correction (en, de, fr, es, it)
 │       ├── visit_<lang>_contact_lens.json        # Keratoconus, scleral lens fitting & corneal curvature (en, de, fr, es, it)
 │       └── visit_<lang>_comprehensive.json       # Comprehensive diabetic eye exam & presbyopia review (en, de, fr, es, it)
+├── reports/
+│   └── .gitkeep                    # Directory tracking for exported benchmark & audit reports
 ├── scripts/
-│   ├── benchmark_eval.py           # Quantitative accuracy, hallucination, and latency benchmark
+│   ├── benchmark_eval.py           # Quantitative accuracy, slot-level F1, hallucination, and latency benchmark
 │   ├── generate_gold_set.py        # Gold benchmark dataset generator
 │   └── normalize_cli.py            # Standalone CLI tool with Markdown findings table generator
 ├── src/
@@ -594,6 +609,7 @@ optonorm/
 │   ├── test_i18n_es.py             # Spanish locale unit and transcript integration tests
 │   ├── test_i18n_de.py             # German locale unit and transcript integration tests
 │   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
+│   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
 │   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
 │   ├── test_pipeline.py            # End-to-end normalization pipeline tests
@@ -677,6 +693,9 @@ uv run main.py -i visit.txt -o normalized.txt --output-fhir bundle.json --fhir-f
 # Pipe transcript from another command or file
 cat transcript.txt | uv run main.py
 
+# Interactive terminal diff visualizer (comparing raw ASR speech with normalized clinical shorthand)
+uv run optonorm "visual acuity 20 20 right eye, IOP 14 mmHg left eye" --diff
+
 # Real-time streaming mode over pipe or live standard input (Dimension 2)
 cat live_stream.txt | uv run optonorm --stream --locale en
 
@@ -707,14 +726,20 @@ Interactive OpenAPI documentation will be immediately accessible at:
 uv run pytest -v
 ```
 
-### 5. Run the Gold Benchmark Evaluation
+### 5. Run the Gold Benchmark Evaluation & Slot-Level IE Metrics
 
 ```bash
-# Run benchmark across all supported languages (EN, FR, IT, ES - 571 utterances)
+# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 682 utterances) with slot-level Precision/Recall/F1
 uv run python scripts/benchmark_eval.py --locale all
 
 # Or run for a specific locale
 uv run python scripts/benchmark_eval.py --locale fr
+
+# Run adversarial noisy ASR benchmark suite (155 utterances)
+uv run python scripts/benchmark_eval.py --noisy
+
+# Export comprehensive markdown report for CI/CD audit gates
+uv run python scripts/benchmark_eval.py --export-report reports/benchmark_report.md
 ```
 
 ---
