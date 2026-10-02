@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="media/logo.svg" alt="OptoNorm Logo" width="280" />
+</p>
+
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
@@ -528,6 +532,9 @@ optonorm/
 │       ├── visit_<lang>_pediatric_strabismus.json# Pediatric optometry, strabismus cover test & prism correction (en, de, fr, es, it)
 │       ├── visit_<lang>_contact_lens.json        # Keratoconus, scleral lens fitting & corneal curvature (en, de, fr, es, it)
 │       └── visit_<lang>_comprehensive.json       # Comprehensive diabetic eye exam & presbyopia review (en, de, fr, es, it)
+├── media/
+│   ├── logo.png                    # OptoNorm project logo (transparent PNG)
+│   └── logo.svg                    # OptoNorm scalable vector project logo (SVG)
 ├── reports/
 │   └── .gitkeep                    # Directory tracking for exported benchmark & audit reports
 ├── scripts/
