@@ -5,11 +5,13 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
+[![Version: 0.18.0](https://img.shields.io/badge/version-0.18.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
+[![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
 [![Tests](https://img.shields.io/badge/tests-275%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.54%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.53%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -114,41 +116,60 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Zero-Latency Narrative Flushing**: Immediately emits conversational ambient prose outside clinical slots without buffering delays, preserving doctor-patient dialogue 100% verbatim.
    - **Native Streaming Transport**: Full support for real-time WebSockets (`/v1/normalize/stream`), Server-Sent Events (`/v1/normalize/sse`), and piped CLI streaming (`optonorm --stream`).
 
+10. **Interactive Clinical Web Playground (React 19 & Redux Toolkit)**:
+    - **Modern Scribe Cockpit**: High-fidelity clinical workbench powered by React 19, Redux Toolkit, TanStack Form, and TanStack Query with zero state-drift and strict single-direction data flow.
+    - **Simulated Ambient ASR Scribe**: Full-duplex WebSocket stream (`/v1/normalize/stream`) simulating live speech token arrival, featuring a visual **Holdback HUD** displaying bilateral symmetry pauses (e.g. IOP / Pachymetry / TBUT) before canonical `OU` commit.
+    - **Visual Clinical Diff Viewer & Findings Table**: Side-by-side and inline comparative diff highlighting replaced speech spans vs untouched verbatim narrative, coupled with structured extraction tables mapped to LOINC and SNOMED CT terminology.
+    - **HL7 FHIR R4 Inspector & US Core 6.1.0 Consultation Note**: Interactive JSON tree viewer for discrete Observation bundles alongside rich human-readable XHTML consultation notes with one-click export (JSON / HTML) and print-ready layouts.
+
 ---
 
 ## Architectural Overview
 
 ```mermaid
 flowchart TD
-    A[Raw ASR Transcript] --> B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
-    B --> PRE[Acoustic & Speech Dysfluency Preprocessor<br/>Self-Correction Engine · Punctuation Re-Stitcher · Stutter Collapser]
-    PRE --> C[Candidate Span Extractors]
+    subgraph Client ["Interactive Clinical Web Playground (React 19 + Redux Toolkit)"]
+        W1[Clinical Form & Presets<br/>@tanstack/react-form]
+        W2[Ambient Scribe Simulator<br/>WebSocket Stream & Holdback HUD]
+        W3[Clinical Diff & Findings<br/>LOINC / SNOMED CT Table]
+        W4[FHIR R4 Inspector & Note<br/>US Core 6.1.0 Consultation Note]
+    end
+
+    subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
+        API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
+        B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
+        PRE[Acoustic & Speech Dysfluency Preprocessor<br/>Self-Correction Engine · Punctuation Re-Stitcher · Stutter Collapser]
+        C[Candidate Span Extractors]
+        
+        subgraph Grammars & Lexicon
+            C --> D1[Visual Acuity Grammar<br/>Snellen, Metric 6m, Pinhole, Decimals]
+            C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add, Rapid Sequences]
+            C --> D3[Tonometry / IOP Grammar<br/>GAT, NCT, iCare, Spoken Units]
+            C --> D4[Prism Grammar<br/>Δ BI, BO, BU, BD]
+            C --> D5[Keratometry Grammar<br/>K Flat, Steep, Cyl, Axis]
+            C --> D6[Cornea Grammar<br/>CCT in µm, TBUT in s]
+            C --> D7[Dynamic C/D Ratio Grammar<br/>Scalar, Asymmetric, Biaxial, Notching]
+            C --> D8[Pupil & RAPD Grammar<br/>Diameters, Light Reflex, Graded RAPD]
+            C --> D9[Slit Lamp Grading Grammar<br/>LOCS III Cataract, SUN AC Cells/Flare, SPK]
+            C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Phorias, Tropias, Ortho]
+            C --> D11[Fixed Clinical Phrase Lexicon]
+        end
+
+        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 --> E[Post-Hoc Verification Pipeline]
+
+        subgraph Safety Guards
+            E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
+            E --> F2[Physiological Range Guard<br/>0.25D, 1-180° Axis, CCT, TBUT, C/D, Pupils, Grading, Δ]
+        end
+
+        F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
+        G --> H[Residue Detection & Optional SLM Escalation]
+        H --> I[Reversible In-Place Span Replacement Engine]
+    end
+
+    Client <-->|REST HTTP & Full-Duplex WebSockets<br/>Host :3000 -> Container :8080 / :8000| API
+    API --> B --> PRE --> C
     PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
-
-    subgraph Grammars & Lexicon
-        C --> D1[Visual Acuity Grammar<br/>Snellen, Metric 6m, Pinhole, Decimals]
-        C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add, Rapid Sequences]
-        C --> D3[Tonometry / IOP Grammar<br/>GAT, NCT, iCare, Spoken Units]
-        C --> D4[Prism Grammar<br/>Δ BI, BO, BU, BD]
-        C --> D5[Keratometry Grammar<br/>K Flat, Steep, Cyl, Axis]
-        C --> D6[Cornea Grammar<br/>CCT in µm, TBUT in s]
-        C --> D7[Dynamic C/D Ratio Grammar<br/>Scalar, Asymmetric, Biaxial, Notching]
-        C --> D8[Pupil & RAPD Grammar<br/>Diameters, Light Reflex, Graded RAPD]
-        C --> D9[Slit Lamp Grading Grammar<br/>LOCS III Cataract, SUN AC Cells/Flare, SPK]
-        C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Phorias, Tropias, Ortho]
-        C --> D11[Fixed Clinical Phrase Lexicon]
-    end
-
-    D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 --> E[Post-Hoc Verification Pipeline]
-
-    subgraph Safety Guards
-        E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
-        E --> F2[Physiological Range Guard<br/>0.25D, 1-180° Axis, CCT, TBUT, C/D, Pupils, Grading, Δ]
-    end
-
-    F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
-    G --> H[Residue Detection & Optional SLM Escalation]
-    H --> I[Reversible In-Place Span Replacement Engine]
 
     I --> J[Normalized EHR Clinical Text]
     I --> K[Structured FHIR R4 Bundle Exporter<br/>LOINC, SNOMED CT, UCUM, DiagnosticReport]
@@ -496,9 +517,9 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **241 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
+  - Test suite expanded to **275 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
 - **Core Engine Rebranding to OptoNorm**:
-  - Standardized as package `optonorm==0.11.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
+  - Standardized as package `optonorm==0.18.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
 ---
 
@@ -535,6 +556,8 @@ optonorm/
 ├── media/
 │   ├── logo.png                    # OptoNorm project logo (transparent PNG)
 │   └── logo.svg                    # OptoNorm scalable vector project logo (SVG)
+├── plans/
+│   └── interactive_web_playground_plan.md # Architectural blueprint & execution plan for React 19 web playground
 ├── reports/
 │   └── .gitkeep                    # Directory tracking for exported benchmark & audit reports
 ├── scripts/
@@ -630,10 +653,30 @@ optonorm/
 │   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
 │   ├── test_streaming.py           # Comprehensive chunked simulation suite (split tokens, bilateral pauses, 19 transcripts)
 │   └── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
-├── Dockerfile                      # Multi-stage unprivileged production container
-├── docker-compose.yml              # Single-command Docker Compose stack
+├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── common/             # Reusable BrandLogo (SVG) and shared UI primitives
+│   │   │   ├── fhir/               # FhirInspector (JSON tree) & ClinicalDocumentView (US Core XHTML)
+│   │   │   ├── form/               # ClinicalInputForm (@tanstack/react-form) & PresetSelector
+│   │   │   ├── inspector/          # ClinicalDiffViewer (inline/side-by-side diff) & FindingsTable
+│   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
+│   │   │   └── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
+│   │   ├── data/                   # Multilingual clinical presets across 5 languages
+│   │   ├── lib/                    # TanStack QueryClient setup and LOINC/SNOMED terminology mappings
+│   │   ├── store/                  # Redux Toolkit store (streamingSlice, normalizationSlice, uiSlice)
+│   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
+│   │   ├── App.tsx                 # Root application cockpit layout
+│   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
+│   ├── public/                     # Static assets including logo.svg favicon
+│   ├── Dockerfile                  # Multi-stage unprivileged web container (Node 22 builder + Nginx runner)
+│   ├── nginx.conf                  # Nginx configuration (SPA fallback + HTTP/WS reverse proxy)
+│   ├── package.json                # Web playground dependencies and scripts
+│   └── vite.config.ts              # Vite configuration with local dev proxy (/v1 -> :8000)
+├── Dockerfile                      # Multi-stage unprivileged production API container
+├── docker-compose.yml              # Multi-service Docker Compose stack (optonorm-api on :8000, optonorm-web on :3000)
 ├── .dockerignore                   # Build artifact exclusions
-├── Makefile                        # Unified developer lifecycle & command automation (lint, test, benchmark, serve)
+├── Makefile                        # Unified developer lifecycle & command automation (lint, test, benchmark, serve, web)
 ├── main.py                         # Unified root entrypoint: CLI, demo, and FastAPI server runner
 ├── pyproject.toml                  # Packaging, console script ('optonorm'), and dependency configuration
 ├── uv.lock                         # Pinned dependency lockfile
@@ -648,6 +691,7 @@ optonorm/
 
 - Python 3.10+ (Recommended: Python 3.13)
 - [`uv`](https://github.com/astral-sh/uv) (fast Python package manager)
+- Node.js 20+ & npm (for interactive web playground development)
 
 ### 1. Clone & Setup Environment
 
@@ -657,6 +701,9 @@ cd optonorm
 
 # Create virtual environment and sync dependencies
 uv sync
+
+# (Optional) Install web playground frontend dependencies
+make web-install
 ```
 
 ### Quick Developer Commands (`make`)
@@ -666,12 +713,17 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (223 tests)
+make test           # Run complete test suite with pytest (275 tests)
 make test-streaming # Run real-time streaming & ambient scribing test suite (48 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
-make dev            # Start development FastAPI server with auto-reload
+make dev            # Start development FastAPI server with auto-reload (:8000)
+make web-install    # Install web playground dependencies (npm install in web/)
+make web-dev        # Launch interactive React 19 web playground dev server (:3000)
+make web-build      # Build production web playground bundle in web/dist/
+make web-lint       # Run oxlint & TypeScript type-checking across web codebase
 make normalize      # Test clinical normalization via CLI
 make fhir-doc       # Test FHIR R4 consultation document bundle export
+make docker-up      # Start multi-service stack (Web :3000 + API :8000) via Docker Compose
 make clean          # Remove cache and build artifacts
 ```
 
@@ -942,18 +994,117 @@ curl -N "http://localhost:8000/v1/normalize/sse?transcript=visual%20acuity%20202
 
 ---
 
-## Containerized Deployment (Docker & Compose)
+## Interactive Clinical Web Playground (React 19 & Redux Toolkit)
 
-OptoNorm includes a multi-stage Docker build producing an unprivileged, secure container:
+OptoNorm includes a modern, production-grade clinical web playground located in [`web/`](web/) engineered for clinicians, EHR integrators, and clinical NLP researchers. Built on **React 19**, **Redux Toolkit**, **TanStack Form**, and **TanStack Query**, it provides a real-time cockpit for transcript normalization, live ASR streaming simulation, and discrete FHIR R4 inspection.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│  OptoNorm Clinical Playground Cockpit                                  │
+│  [Logo] OptoNorm v0.18.0   ● API Online (0.53 ms)     [GitHub] [Theme] │
+├───────────────────────────────────┬────────────────────────────────────┤
+│  Clinical Input & Presets         │  Live Scribe & Output Inspector    │
+│  - Patient & Practitioner ID      │  - Tabs: Visual Diff | Findings    │
+│  - Locale & Convention Selectors  │    | FHIR JSON | Consultation Note │
+│  - 10 Multilingual Presets        │  - Redux Ambient Scribe Simulator  │
+│  - Batch Normalization Mutation   │  - WebSocket Stream (/v1/.../ws)   │
+│  - Live Character Count           │  - Holdback Buffer Visual HUD      │
+└───────────────────────────────────┴────────────────────────────────────┘
+```
+
+### Key Modules & Capabilities
+
+1. **Clinical Input Form & Multilingual Presets (`@tanstack/react-form`)**:
+   - Zero-lag typed input using fine-grained reactive subscriptions (`form.Subscribe`).
+   - Configurable encounter metadata: Patient ID, Practitioner ID, Locale (`auto`, `en`, `fr`, `it`, `es`, `de`), Shorthand Convention (`international`, `localized`), and FHIR Bundle Format (`transaction`, `collection`, `document`, `diagnostic_report`).
+   - One-click loader for 10 clinical presets spanning Presbyopia Refraction, Cataract Evaluation (LOCS III), Glaucoma Suspect (diurnal IOP & pachymetry), Dry Eye Disease (TBUT & stain grading), and Pediatric Strabismus.
+
+2. **Redux Ambient Scribe Simulator (`StreamingSimulator.tsx`)**:
+   - Powered by a centralized Redux Toolkit state machine ([`streamingSlice.ts`](web/src/store/slices/streamingSlice.ts)) fully inspectable in Redux DevTools.
+   - Connects over full-duplex WebSockets to `/v1/normalize/stream`, streaming simulated speech tokens at customizable playback rates ($0.5\times$ to $5.0\times$).
+   - **Holdback Buffer HUD**: Real-time visualization of unilateral findings held in the buffer across clinician pauses, demonstrating bilateral symmetry synthesis before committing canonical `OU` shorthand.
+
+3. **Visual Clinical Diff Viewer (`ClinicalDiffViewer.tsx`)**:
+   - Dual visualization modes: **Inline** and **Side-by-Side**.
+   - Color-coded tokens: Strikethrough red for replaced conversational speech, bold green for standardized optometric shorthand, amber for flagged clinical review warnings, and untouched narrative preserved 100% verbatim.
+
+4. **Structured Findings Table (`FindingsTable.tsx`)**:
+   - Categorized summary of all parsed findings with laterality, extracted value, and direct mapping to verified healthcare standards:
+     - **LOINC** measurement and panel codes (`8629-0`, `28634-4`, `55284-4`, `70949-3`, etc.).
+     - **SNOMED CT** anatomical and qualitative concepts (`28400003`, `414646002`, `231872005`, etc.).
+
+5. **Interactive HL7 FHIR R4 Inspector (`FhirInspector.tsx`)**:
+   - Collapsible JSON resource tree for discrete `Observation`, `DiagnosticReport`, and `Composition` bundles.
+   - Fast filtering by clinical category (`va`, `refraction`, `iop`, `exam`).
+   - One-click copy to clipboard and `.json` file download.
+
+6. **US Core 6.1.0 Clinical Consultation Document View (`ClinicalDocumentView.tsx`)**:
+   - Human-readable XHTML clinical note generated directly from FHIR `Composition.text`.
+   - Complete with patient/practitioner header, structured exam sections, one-click export (JSON / HTML), and dedicated print styling (`@media print`).
+
+### Launching the Web Playground
+
+#### Mode 1: Single-Command Docker Compose (Full Stack)
+
+Launch both the FastAPI backend and the React 19 web frontend with a single command:
 
 ```bash
-# Build and run with Docker Compose
+# Build and launch both containers in the background
 docker compose up --build -d
 
-# Check health probe
+# Check health and view logs
+make docker-logs
+```
+
+- **Web Playground UI**: Accessible at [`http://localhost:3000`](http://localhost:3000)
+- **FastAPI REST & WebSocket Server**: Accessible at [`http://localhost:8000`](http://localhost:8000)
+- **Interactive Swagger Docs**: Accessible at [`http://localhost:8000/docs`](http://localhost:8000/docs)
+
+To stop services:
+```bash
+docker compose down
+```
+
+#### Mode 2: Local Dual-Server Development
+
+For rapid local frontend or backend iteration with hot module replacement (HMR):
+
+```bash
+# 1. Install frontend dependencies
+make web-install
+
+# 2. Start FastAPI backend (in Terminal 1)
+make dev
+
+# 3. Start Vite React 19 dev server with proxy to :8000 (in Terminal 2)
+make web-dev
+```
+
+- Vite automatically proxies `/v1` HTTP requests and `/v1/normalize/stream` WebSocket traffic to the local FastAPI server at `http://localhost:8000`.
+
+---
+
+## Containerized Deployment (Docker & Compose)
+
+OptoNorm provides multi-stage unprivileged Docker containers for secure enterprise deployment:
+
+- **API Container ([`Dockerfile`](Dockerfile))**: Built on `python:3.13-slim` using `uv`, running as non-root user `optonorm` (UID 10001) on port `8000`.
+- **Web Container ([`web/Dockerfile`](web/Dockerfile))**: Multi-stage build (`node:22-alpine` builder, `nginxinc/nginx-unprivileged:alpine` runner) serving the compiled React 19 SPA on unprivileged port `8080` (mapped to host port `3000`). Reverse proxies API and WebSocket requests with healthcheck dependency on `optonorm-api`.
+
+```bash
+# Start multi-service stack with Docker Compose
+docker compose up --build -d
+
+# Verify API health
 curl http://localhost:8000/v1/health
 
-# Stop service
+# Verify Web playground
+curl http://localhost:3000/
+
+# Stream logs
+docker compose logs -f
+
+# Teardown
 docker compose down
 ```
 
