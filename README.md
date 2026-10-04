@@ -5,13 +5,13 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.21.0](https://img.shields.io/badge/version-0.21.0-blue.svg)]()
+[![Version: 0.21.3](https://img.shields.io/badge/version-0.21.3-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-282%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-284%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.58%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.59%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -25,6 +25,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
 
 1. **Deterministic Typed Grammars**:
    - **Visual Acuity**: Distance Snellen (Imperial `20/20`–`20/400`, Metric `6/6`, `6/9`, `6/12`, `6/7.5`, `6/60`), pinhole (`PH 20/25`, `PH 6/7.5`), qualitative acuities (`CF @ 3ft`, `HM`, `LP`, `NLP`), monocular (`OD`, `OS`) and binocular (`OU`) laterality.
+   - **Visual Acuity Tails & Outcome Clauses**: Recognizes visual acuity outcome tails following manifest refraction refinement (e.g. _"giving 2020"_ $\rightarrow$ `giving VA 20/20`, _"Also 2020"_ $\rightarrow$ `VA 20/20`), and binocular balance endpoints (_"Nuclear balance accepted with both eyes open. 2020"_ $\rightarrow$ `Binocular balance: 20/20 OU`).
    - **Explicit Distance & Near Differentiation**:
      - Explicit _"distance visual acuity"_ / _"distance acuity"_ $\rightarrow$ **`DVA`** (e.g., `DVA OD 20/400 sc`, `DVA OD 6/12 PH 6/7.5 sc`). Contextually propagates across contralateral eyes in the same distance test sequence.
      - Explicit _"near visual acuity"_ / _"near vision"_ $\rightarrow$ **`NVA`** (e.g., `NVA OU 20/20`).
@@ -70,8 +71,9 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - Spoken pressure units & word numbers: `"15 mm of mercury"` $\rightarrow$ `15 mmHg`, `"twenty-one millimeters of mercury"` $\rightarrow$ `21 mmHg`
    - **Decimal-Less Diopter & Refraction Normalizer (`refraction_repair.py`)**:
      - Rapid sequence integer diopters: Normalizes unpunctuated 3-to-5 number sequences (`"-1 2 40"` $\rightarrow$ `-1.00 -2.00 x 040`, `"1 1 and 40"` $\rightarrow$ `+1.00 -1.00 x 040`, `"1 1 and 1"` $\rightarrow$ `+1.00 -1.00 x 001`, `"125 075 8"` $\rightarrow$ `-1.25 -0.75 x 008`)
-     - Compound cylinder-axis concatenation: Unpacks conjoined tokens (e.g. `"-0.75x180"` $\rightarrow$ `-0.75 x 180`)
-     - Habitual glasses measurement dictation: Standardizes phrases like `"Glasses measured minus 125 minus 075 axis 8"` $\rightarrow$ `OD -1.25 -0.75 x 008`
+     - Compound cylinder-axis concatenation: Unpacks conjoined tokens (e.g. `"-0.75x180"` $\rightarrow$ `-0.75 x 180`, `"-75120"` $\rightarrow$ `-0.75 x 120`)
+     - Habitual glasses measurement dictation: Standardizes phrases like `"Glasses measured minus 125 minus 075 axis 8"` $\rightarrow$ `OD -1.25 -0.75 x 008`, and ASR headers `"Losses measures right -1?"` $\rightarrow$ `Glasses measured: OD -1.00`
+     - Multi-turn contralateral refraction stitching: Correctly normalizes split turns (`"-3 - 1."` $\rightarrow$ `OS -3.00 -1.00`, `"120."` $\rightarrow$ `x 120`, `"-325."` $\rightarrow$ `OS -3.25.`, `"3.25."` $\rightarrow$ `OS -3.25.`, `"2.5 -, .75 at 90"` $\rightarrow$ `OD -2.50 -0.75 x 090`) while maintaining turn-by-turn timestamps and dialogue boundaries
    - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
 
 5. **Reversible Audit Trail**:
@@ -530,9 +532,9 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **282 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
+  - Test suite expanded to **283 passing tests** (including 49 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
 - **Core Engine Package Version**:
-  - Standardized as package `optonorm==0.21.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
+  - Standardized as package `optonorm==0.21.1` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
 ---
 
@@ -1016,7 +1018,7 @@ OptoNorm includes a modern, production-grade clinical web playground located in 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │  OptoNorm Clinical Playground Cockpit                                  │
-│  [Logo] OptoNorm v0.21.0   ● API Online (0.58 ms)     [GitHub] [Theme] │
+│  [Logo] OptoNorm v0.21.1   ● API Online (0.56 ms)     [GitHub] [Theme] │
 ├───────────────────────────────────┬────────────────────────────────────┤
 │  Clinical Input & Presets         │  Live Scribe & Output Inspector    │
 │  - Patient & Practitioner ID      │  - Tabs: Visual Diff | Findings    │
