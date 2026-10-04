@@ -5,13 +5,13 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.18.0](https://img.shields.io/badge/version-0.18.0-blue.svg)]()
+[![Version: 0.21.0](https://img.shields.io/badge/version-0.21.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-275%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-282%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.53%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.58%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -60,14 +60,19 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Self-Correction Engine (`self_correction.py`)**: Detects spoken reset and retraction operators across 5 languages (English: *"no wait"*, *"sorry"*, *"make that"*, *"scratch that"*, *"correction"*; French: *"pardon"*, *"non attendez"*, *"je voulais dire"*; German: *"Entschuldigung"*, *"nein warte"*, *"Korrektur"*, *"besser gesagt"*; Italian: *"scusa"*, *"no aspetta"*, *"volevo dire"*; Spanish: *"perdón"*, *"no espera"*, *"quise decir"*). When a clinician retracts a finding mid-utterance (e.g. `[VA] + "no wait" + [VA]`), OptoNorm supersedes the earlier span, marking it as discarded speech while preserving the intended clinical measurement.
    - **ASR Number-Punctuation Re-Stitcher (`punctuation_repair.py`)**: Repairs punctuation fractures inserted by acoustic pause detection in commercial ASR models (e.g., `"axis 1. 80"` $\rightarrow$ `"axis 180"`, `"minus 2. 50"` $\rightarrow$ `"minus 2.50"`, `"14. mmHg"` $\rightarrow$ `"14 mmHg"`).
    - **Stutter & Repetition Collapser (`repetition.py`)**: Collapses immediately duplicated clinical keywords, signs, laterality, and modalities (e.g., `"minus minus"`, `"sphere sphere"`, `"cylinder cylinder"`, `"right eye right eye"`).
-   - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
-   - **Phonetic & Acoustic Artifact Repairs**:
+   - **Phonetic & Acoustic Artifact Repairs (`acoustic_repair.py`)**:
      - Phonetic decimals: `"minus OH .25 cylinder"` $\rightarrow$ `-0.25 cylinder`
      - Concatenated 4-digit Snellen numbers: `"2020"` $\rightarrow$ `20/20`, `"2400"` $\rightarrow$ `20/400`, `"2300"` $\rightarrow$ `20/300`, `"2200"` $\rightarrow$ `20/200`, `"2100"` $\rightarrow$ `20/100`, `"2080"` $\rightarrow$ `20/80`
+     - Prepositional laterality expansion: Normalizes phrases like `"for the right eye"` $\rightarrow$ `OD`, `"for the left eye"` $\rightarrow$ `OS`, `"for both eyes"` $\rightarrow$ `OU`
      - Hybrid compound spoken numbers: ASR digit-word hybrids like `"at 100 sixty-eight degrees"` or `"100 68 degrees"` $\rightarrow$ `axis 168`
      - Spoken degree symbols: `"at 175°"` $\rightarrow$ `axis 175`, `"at 10°"` $\rightarrow$ `axis 010`
      - Phonetic acoustic near-add variants: Conversational phrasing (`"frenir"`, `"frenier"`, `"for near"`)
      - Spoken pressure units & word numbers: `"15 mm of mercury"` $\rightarrow$ `15 mmHg`, `"twenty-one millimeters of mercury"` $\rightarrow$ `21 mmHg`
+   - **Decimal-Less Diopter & Refraction Normalizer (`refraction_repair.py`)**:
+     - Rapid sequence integer diopters: Normalizes unpunctuated 3-to-5 number sequences (`"-1 2 40"` $\rightarrow$ `-1.00 -2.00 x 040`, `"1 1 and 40"` $\rightarrow$ `+1.00 -1.00 x 040`, `"1 1 and 1"` $\rightarrow$ `+1.00 -1.00 x 001`, `"125 075 8"` $\rightarrow$ `-1.25 -0.75 x 008`)
+     - Compound cylinder-axis concatenation: Unpacks conjoined tokens (e.g. `"-0.75x180"` $\rightarrow$ `-0.75 x 180`)
+     - Habitual glasses measurement dictation: Standardizes phrases like `"Glasses measured minus 125 minus 075 axis 8"` $\rightarrow$ `OD -1.25 -0.75 x 008`
+   - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
 
 5. **Reversible Audit Trail**:
    - Performs non-destructive in-place character offset span replacement.
@@ -138,7 +143,7 @@ flowchart TD
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
         API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
-        PRE[Acoustic & Speech Dysfluency Preprocessor<br/>Self-Correction Engine · Punctuation Re-Stitcher · Stutter Collapser]
+        PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Acoustic Phonetic Repair · Refraction & Diopter Repair]
         C[Candidate Span Extractors]
         
         subgraph Grammars & Lexicon
@@ -260,7 +265,7 @@ Evaluated on the 682-utterance Multilingual Gold Evaluation Benchmark across Eng
 | **Corneal Pachymetry (CCT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.31 ms    |
 | **Tear Breakup Time (TBUT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.30 ms    |
 | **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.15 ms    |
-| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.54 ms**  |
+| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.58 ms**  |
 
 ### Slot-Level Information Extraction & Verbatim Integrity Metrics
 
@@ -504,6 +509,14 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 
 ## Latest Key Improvements & Technical Highlights
 
+- **Acoustic & Phonetic ASR Repair Engine (`acoustic_repair.py`)**:
+  - Synthesizes phonetic decimals (e.g. `"minus OH .25 cylinder"` $\rightarrow$ `-0.25 cylinder`), collapses spoken degree symbols (`"at 180°"` $\rightarrow$ `axis 180`), repairs 4-digit concatenated Snellen numbers (`"2020"` $\rightarrow$ `20/20`, `"2400"` $\rightarrow$ `20/400`), and canonicalizes prepended prepositional laterality phrases (`"for the right eye"` $\rightarrow$ `OD`, `"for the left eye"` $\rightarrow$ `OS`).
+- **Refraction Token & Diopter Shorthand Normalizer (`refraction_repair.py`)**:
+  - Normalizes decimal-less rapid diopter sequence tokens (e.g. `"-1 2 40"` $\rightarrow$ `-1.00 -2.00 x 040`, `"1 1 and 40"` $\rightarrow$ `+1.00 -1.00 x 040`, `"1 1 and 1"` $\rightarrow$ `+1.00 -1.00 x 001`, `"125 075 8"` $\rightarrow$ `-1.25 -0.75 x 008`), unpacks joined cylinder-axis compound tokens (e.g. `"-0.75x180"` $\rightarrow$ `-0.75 x 180`), and standardizes habitual glasses measurement dictation (`"Glasses measured minus 125 minus 075 axis 8"` $\rightarrow$ `OD -1.25 -0.75 x 008`).
+- **Multi-Sentence Contralateral Continuity & Clinical Discourse Robustness**:
+  - Tonometry grammar (`iop.py`) tracks contralateral pressure findings across intervening clinical observations and narrative sentences (`"Right eye pressure 14. Cornea clear. Left eye 15"` $\rightarrow$ `IOP: 14 OD, 15 OS mmHg`).
+  - Tear Breakup Time (`cornea.py`) supports conversational copulas such as `"TBUT is around 5 seconds"` $\rightarrow$ `TBUT: 5s OU`.
+  - Expanded slit lamp lexicon (`phrases.py`) with canonical findings (`"angles open"`, `"quiet anterior chamber"`, `"quiet deep anterior chamber"`).
 - **Real-Time Streaming & Ambient Scribing Architecture (Dimension 2)**:
   - Added `StreamingNormalizerBuffer` and `OffsetTracker` in `opto_normalizer.streaming` for low-latency live ASR chunk ingestion.
   - Implemented symmetrical bilateral holdback across speech pauses (IOP, Pachymetry, TBUT) and decimal fraction lookahead guards.
@@ -517,9 +530,9 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **275 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
-- **Core Engine Rebranding to OptoNorm**:
-  - Standardized as package `optonorm==0.18.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
+  - Test suite expanded to **282 passing tests** (including 48 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
+- **Core Engine Package Version**:
+  - Standardized as package `optonorm==0.21.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
 ---
 
@@ -556,13 +569,12 @@ optonorm/
 ├── media/
 │   ├── logo.png                    # OptoNorm project logo (transparent PNG)
 │   └── logo.svg                    # OptoNorm scalable vector project logo (SVG)
-├── plans/
-│   └── interactive_web_playground_plan.md # Architectural blueprint & execution plan for React 19 web playground
 ├── reports/
 │   └── .gitkeep                    # Directory tracking for exported benchmark & audit reports
 ├── scripts/
 │   ├── benchmark_eval.py           # Quantitative accuracy, slot-level F1, hallucination, and latency benchmark
 │   ├── generate_gold_set.py        # Gold benchmark dataset generator
+│   ├── generate_noisy_benchmark.py # Adversarial noisy ASR benchmark generator across 5 languages
 │   └── normalize_cli.py            # Standalone CLI tool with Markdown findings table generator
 ├── src/
 │   └── opto_normalizer/
@@ -581,10 +593,12 @@ optonorm/
 │       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   └── schemas.py          # Pydantic v2 request/response schemas with clinical examples
-│       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor
+│       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
 │       │   ├── __init__.py         # Pipeline entrypoint (preprocess_transcript)
 │       │   ├── tracker.py          # SpanCoordinateMapper non-destructive offset tracker
+│       │   ├── acoustic_repair.py  # Phonetic ASR artifact & laterality repair (e.g., "for the right eye", "OH .25", "at 180°")
 │       │   ├── punctuation_repair.py # ASR pause punctuation re-stitcher (split decimals, axes, units)
+│       │   ├── refraction_repair.py# Decimal-less diopters, compound cyl-axis shorthand & glasses measurement unpacking
 │       │   ├── repetition.py       # Clinical keyword stutter & repetition collapser
 │       │   └── self_correction.py  # Multilingual spoken self-correction & reset operator engine
 │       ├── streaming/              # Dimension 2: Real-Time Streaming & Ambient Scribing (Chunked ASR)
@@ -624,6 +638,7 @@ optonorm/
 │           ├── phrases_es.py       # Fixed clinical phrase entries (Spanish)
 │           └── phrases_de.py       # Fixed clinical phrase entries (German)
 ├── tests/
+│   ├── test_accuracy_and_fixes_transcripts.py # Real-world transcript accuracy, clinical shorthands & dysfluency regression tests
 │   ├── test_alignment.py           # Unit tests for strabismus and binocular alignment grammar
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
 │   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
@@ -633,11 +648,11 @@ optonorm/
 │   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
 │   ├── test_grading.py             # Unit tests for biomicroscopy and slit lamp severity grading
 │   ├── test_guards.py              # Entailment and range validation unit tests
+│   ├── test_i18n_de.py             # German locale unit and transcript integration tests
+│   ├── test_i18n_es.py             # Spanish locale unit and transcript integration tests
 │   ├── test_i18n_foundation.py     # Language detection, provider resolution, templates compilation tests
 │   ├── test_i18n_fr.py             # French locale unit and transcript integration tests
 │   ├── test_i18n_it.py             # Italian locale unit and transcript integration tests
-│   ├── test_i18n_es.py             # Spanish locale unit and transcript integration tests
-│   ├── test_i18n_de.py             # German locale unit and transcript integration tests
 │   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
 │   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
@@ -646,10 +661,10 @@ optonorm/
 │   ├── test_preprocessors.py       # Unit tests for self-correction, punctuation repair & stutter collapser
 │   ├── test_pupils.py              # Unit tests for pupillary exam and graded RAPD grammar
 │   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen, Fatima, Ryan, Peter)
+│   ├── test_real_transcript_de.py  # End-to-end real German clinical transcript & FHIR export tests
+│   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
-│   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
-│   ├── test_real_transcript_de.py  # End-to-end real German clinical transcript & FHIR export tests
 │   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
 │   ├── test_streaming.py           # Comprehensive chunked simulation suite (split tokens, bilateral pauses, 19 transcripts)
 │   └── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
@@ -713,7 +728,7 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (275 tests)
+make test           # Run complete test suite with pytest (282 tests)
 make test-streaming # Run real-time streaming & ambient scribing test suite (48 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
@@ -1001,7 +1016,7 @@ OptoNorm includes a modern, production-grade clinical web playground located in 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │  OptoNorm Clinical Playground Cockpit                                  │
-│  [Logo] OptoNorm v0.18.0   ● API Online (0.53 ms)     [GitHub] [Theme] │
+│  [Logo] OptoNorm v0.21.0   ● API Online (0.58 ms)     [GitHub] [Theme] │
 ├───────────────────────────────────┬────────────────────────────────────┤
 │  Clinical Input & Presets         │  Live Scribe & Output Inspector    │
 │  - Patient & Practitioner ID      │  - Tabs: Visual Diff | Findings    │
