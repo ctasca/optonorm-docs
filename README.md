@@ -5,13 +5,13 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.21.3](https://img.shields.io/badge/version-0.21.3-blue.svg)]()
+[![Version: 0.22.0](https://img.shields.io/badge/version-0.22.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-284%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-329%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.59%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.62%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -85,7 +85,10 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - **Distance Visual Acuity**: LOINC `8629-0`
      - **Near Visual Acuity**: LOINC `8630-8`
      - **Correction Method**: SNOMED-CT `422490008` (_Without corrective lenses / sc_) / `420130008` (_With corrective lenses / cc_)
-     - **Refraction (Sphere, Cylinder, Axis, Add)**: LOINC `28634-4` with UCUM `[diop]` / `deg`
+     - **Refraction (Sphere, Cylinder, Axis, Add, PD)**:
+       - **Composite Refraction Observation (US Core & Epic profile)**: LOINC `28618-7` (*Physical findings of Refraction*) with subcomponents for Sphere (`28615-3`), Cylinder (`28616-1`), Axis (`28617-9`), Reading Add (`28614-6`), and Pupillary Distance (`89073-1`), paired with SNOMED-CT laterality (`362502000` OD, `362503005` OS, `40638003` OU).
+       - **Legacy Refraction Panel**: LOINC `28634-4` with UCUM `[diop]` / `deg`.
+     - **Contact Lens Prescription & Evaluation**: LOINC `57077-0` (*Contact lens prescription*), Base Curve (`57078-8`), Diameter (`57079-6`), and Over-Refraction (`95383-6`).
      - **Prism Prescription**: LOINC `28641-9` with UCUM `[p'diop]`
      - **Keratometry Curvature Panel**: LOINC `8626-6` (Flat K LOINC `8627-4`, Steep K LOINC `8628-2`)
      - **Corneal Pachymetry (CCT)**: LOINC `71813-0` with UCUM `um`
@@ -128,6 +131,17 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
     - **Simulated Ambient ASR Scribe**: Full-duplex WebSocket stream (`/v1/normalize/stream`) simulating live speech token arrival, featuring a visual **Holdback HUD** displaying bilateral symmetry pauses (e.g. IOP / Pachymetry / TBUT) before canonical `OU` commit.
     - **Visual Clinical Diff Viewer & Findings Table**: Side-by-side and inline comparative diff highlighting replaced speech spans vs untouched verbatim narrative, coupled with structured extraction tables mapped to LOINC and SNOMED CT terminology.
     - **HL7 FHIR R4 Inspector & US Core 6.1.0 Consultation Note**: Interactive JSON tree viewer for discrete Observation bundles alongside rich human-readable XHTML consultation notes with one-click export (JSON / HTML) and print-ready layouts.
+
+11. **Clinical Decision Support (CDS) & Sight-Threatening Red-Flag Triage Engine**:
+    - **Glaucoma Asymmetry Alert**: Detects cup-to-disc ratio asymmetry $\ge 0.20$ or monocular C/D $\ge 0.65$ (`CDS_GLAUCOMA_ASYMMETRY`, Warning).
+    - **Hyper-Acute IOP / Angle-Closure Alert**: Flags intraocular pressure $\ge 30\text{ mmHg}$ (`CDS_ELEVATED_IOP_CRITICAL`, Critical Urgent).
+    - **Retinal Detachment / Tear Suspect**: Flags symptom triad of flashes, floaters, and curtain/veil (`CDS_RETINA_TEAR_SUSPECT`, Critical Urgent).
+    - **Pediatric Amblyopia Risk**: Flags spherical equivalent anisometropia $> 1.50\text{ D}$ in pediatric patients (`CDS_AMBLYOPIA_RISK`, Warning).
+    - Synchronizes alerts as FHIR `Flag` resources conforming to US Core standards.
+
+12. **Epic Hyperspace & EHR Dotphrase Macro Exporter (`.OPTOEXAM`)**:
+    - Generates multi-line EHR smartphrases ready for direct copy/paste or API insertion into Epic Hyperspace, Cerner Millennium, or AthenaHealth.
+    - CLI flag `--dotphrase` and API parameter `export_dotphrase=true`.
 
 ---
 
