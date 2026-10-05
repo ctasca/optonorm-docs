@@ -5,19 +5,20 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.22.0](https://img.shields.io/badge/version-0.22.0-blue.svg)]()
+[![Version: 0.26.1](https://img.shields.io/badge/version-0.26.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-329%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-783%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
+
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.62%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.83%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
 **OptoNorm** is a specialized clinical NLP engine engineered for Optometry and Ophthalmology electronic health record (EHR) systems. It bridges the gap between raw, conversational Speech-to-Text (ASR) transcripts and standardized clinical notation.
 
-Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuity was measured at twenty out of twenty in the right eye"_), OptoNorm deterministically extracts and replaces clinical measurement spans with concise, industry-standard clinical shorthand (`VA OD 20/20`), while leaving ambient clinician narrative **100% verbatim**. In addition, it maps every finding directly into discrete **HL7 FHIR R4 Observation resources** (LOINC / SNOMED-CT) ready for EHR database synchronization.
+Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuity was measured at twenty out of twenty in the right eye"_), OptoNorm deterministically extracts and replaces clinical measurement spans with concise, industry-standard clinical shorthand (`VA OD 20/20`), while leaving ambient clinician narrative **100% verbatim**. Measurement findings map to **HL7 FHIR R4 Observation** resources (LOINC / SNOMED-CT). Spoken ocular medications map to **MedicationStatement** resources (RxNorm). The normalized note, structured findings, and alerts are a draft for the optometrist to verify.
 
 ---
 
@@ -34,14 +35,18 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Subjective & Objective Refraction**:
      - Standard dictation: Sphere, cylinder, axis, and reading add powers (`OD -2.50 -0.75 x 180 Add +2.00`).
      - Isolated cylinder clauses with dysfluency resilience (`"-0.75 cylinder Cylinder at 85° for the left eye"` $\rightarrow$ `OS -0.75 x 085`, `"-1.75 sphere -0.50 cylinder cylinder at 20°"` $\rightarrow$ `OD -1.75 -0.50 x 020`) and standalone reading add prescriptions (`Add +1.75 OU`, `"Frenier, the AD is plus 2.00 diopters in both eyes"` $\rightarrow$ `Add +2.00 OU`).
-     - **3-to-5 Number Rapid Sequence Dictation**: Clinicians dictating rapid numeric sequences without parameter words, with or without spoken connectors like _"and"_ / _"at"_ / _"x"_ (e.g., _"Manifest Refraction is 1 1 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Manifest Refraction is 1 1 and 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Refraction is 1 1 and 1"_ $\rightarrow$ `+1.00 -1.00 x 001`, _"Left eye is -1 2 40"_ $\rightarrow$ `OS -1.00 -2.00 x 040`, _"Right eye is -2.50 -0.75 180 2.00 64"_ $\rightarrow$ `OD -2.50 -0.75 x 180 Add +2.00 PD 64`). Automatically infers standard optometric minus cylinder convention and hyperopic sphere signs without triggering numeric entailment review flags.
+     - **3-to-5 Number Rapid Sequence Dictation**: Clinicians dictating rapid numeric sequences without parameter words, with or without spoken connectors like _"and"_ / _"at"_ / _"x"_ (e.g., _"Manifest Refraction is 1 1 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Manifest Refraction is 1 1 and 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Refraction is 1 1 and 1"_ $\rightarrow$ `+1.00 -1.00 x 001`, _"Left eye is -1 2 40"_ $\rightarrow$ `OS -1.00 -2.00 x 040`, _"Right eye is -2.50 -0.75 180 2.00 64"_ $\rightarrow$ `OD -2.50 -0.75 x 180 Add +2.00 PD 64`). Unsigned cylinder still follows the minus-cylinder convention. An unsigned sphere is proposed as plus and flagged for review, because that sign was not spoken.
+   - **Contact Lens Examination, Brands & Over-Refraction**:
+     - Standardizes contact lens specifications (Brand, Modality, Base Curve, Diameter, Sphere, Cylinder, Axis, Add Power) e.g., `Biofinity OD: Toric / BC 8.7 / Dia 14.5 / -2.00 -1.25 x 180`.
+     - Contact lens over-refraction (`CL OR OD: plano -0.50 x 010 -> 20/20`, `CL OR OS: +0.25 -> 20/20`).
+     - **Intelligent Brand & Acoustic Matcher (`contact_lens_catalog.py`)**: Master catalog of 35+ commercial contact lenses across Johnson & Johnson, Alcon, CooperVision, Bausch + Lomb, and Specialty labs (RGP, Scleral, Ortho-K, Hybrid) with FDA material group, Dk/t, water content, base curves, diameters, and modalities. Resolves severe ASR acoustic phonetic slips (*"daily's total won toric"* $\rightarrow$ `Dailies Total 1 for Astigmatism`, *"bio affinity toric"* $\rightarrow$ `Biofinity Toric`, *"aqua view oasis"* $\rightarrow$ `Acuvue Oasys`, *"clarity one day"* $\rightarrow$ `Clariti 1 Day`, *"precision won"* $\rightarrow$ `Precision1`, *"total thirty toric"* $\rightarrow$ `Total 30 for Astigmatism`) while enforcing zero false positives on negative controls.
    - **Prism Diopter & Binocular Alignment**: Parses horizontal (`BI`, `BO`) and vertical (`BU`, `BD`) prism powers with the prism delta symbol (`Δ`), supporting monocular prescriptions (`2Δ BO OD`, `1.5Δ BU OD`) and compound horizontal/vertical prisms (`2Δ BO 1.5Δ BU`).
    - **Corneal Keratometry (K-Readings)**: Standardizes manual and automated keratometry diopters and principal meridians into flat K, steep K, and corneal astigmatism cylinder (`K OD: 43.00 @ 180 / 44.25 @ 090`, `K OS: 42.75 @ 005 / 44.50 @ 095`).
    - **Pachymetry & Tear Breakup Time (TBUT)**:
      - Ultrasound Central Corneal Thickness (CCT): Standardizes micrometer measurements (`CCT: 515 OD, 520 OS µm`, `CCT: 540 OU µm`).
      - Tear Film Breakup Time: Fluorescein sodium breakup times in seconds (`TBUT: 4s OD, 3s OS`, `TBUT: 5s OU`).
    - **Tonometry (IOP)**: Goldmann Applanation Tonometry (GAT), Tonopen, iCare, and Non-Contact Air Puff (NCT) (`IOP: 14 OD, 15 OS mmHg`, `IOP: 21 OU mmHg`). Parses spoken "brief puff" and natural-language tonometry pressure readings with digit or word-form units (e.g., _"The pressure is twenty-one millimeters of mercury in the right eye and 21 in the left eye"_ $\rightarrow$ canonical clinical shorthand `IOP: 21 OU mmHg`, _"18mm of mercury right eye and 19 left eye"_ $\rightarrow$ `IOP: 18 OD, 19 OS mmHg`). Symmetrical bilateral pressures automatically resolve to `OU`. Generates discrete monocular HL7 FHIR R4 Observations with LOINC `55284-4` (_Intraocular pressure_).
-   - **Dynamic Cup-to-Disc (C/D) Ratio**: Scalar symmetric (`C/D 0.3 OU`), monocular asymmetric (`C/D: 0.3 OD, 0.7 OS`), and biaxial horizontal/vertical ratios (`C/D OD 0.4H/0.45V`, `C/D OS 0.5H/0.7V (inf notch)`) with neuroretinal rim notching notes (`inf notch`, `sup notch`) and automated clinical glaucoma suspect interpretations across all 5 languages. LOINC `70949-3`.
+   - **Dynamic Cup-to-Disc (C/D) Ratio**: Scalar symmetric (`C/D 0.3 OU`), monocular asymmetric (`C/D: 0.3 OD, 0.7 OS`), and biaxial horizontal/vertical ratios (`C/D OD 0.4H/0.45V`, `C/D OS 0.5H/0.7V (inf notch)`) with neuroretinal rim notching notes (`inf notch`, `sup notch`) across all 5 languages. The glaucoma-suspect flag uses the same $\ge 0.65$ cutoff as CDS, applied to a scalar ratio or to the vertical meridian when one was parsed. Horizontal enlargement alone does not set the flag. LOINC `70949-3`.
    - **Pupillary Examination & RAPD**: Standard findings (`PERRLA`, `PERRL (-) RAPD`), measured dynamic light reflex diameters / anisocoria (`Pupils: 4->2mm OD, 3->2mm OS`, `Pupils: 4->2mm OU`), static diameters (`Pupils: 5mm OD, 3mm OS`), and graded Relative Afferent Pupillary Defects (`2+ RAPD OS`, `1+ RAPD OD`, `trace RAPD OS`). LOINC `80315-5`, `80313-0`, and `76504-0`.
    - **Slit Lamp Severity & Biomicroscopy Grading**: Cataract opacities (LOCS III: `Lens: 2+ NS, 1+ PSC OU`, `Lens: trace NS OU`, `Lens: 2+ NS, 1+ Cort OD`), anterior chamber cells & flare (SUN standardization: `AC: 1+ cells, trace flare`), and corneal superficial punctate keratitis (`Cornea: 2+ SPK inf OU`, `Cornea: trace SPK`). Discrete FHIR observations with SNOMED CT `414646002` (*Nuclear sclerosis*), LOINC `70950-1` (*Flare anterior chamber of eye*), and SNOMED CT `231872005` (*Superficial punctate keratitis*).
    - **Strabismus & Binocular Alignment**: Cover test distance and near phorias (`CT: dist 4Δ EP, near 8Δ EP`, `CT: dist 4Δ XP, near 10Δ XP`), monocular and alternating tropias (`15Δ LXT`, `20Δ RET`, `10Δ XT`), and orthophoria (`Ortho dist & near`, `Ortho dist`, `Ortho near`, `Ortho`). Discrete FHIR observation with LOINC `70951-9` (*Ocular alignment*).
@@ -54,7 +59,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - If even a single digit cannot be mathematically derived from the source tokens, the edit is flagged or aborted. Hallucination rate: **0.00%**.
 
 3. **Physiological & Clinical Boundary Validation**:
-   - Validates diopter increments (must be in 0.25 D steps), cylinder sign conventions, astigmatic axes ($1^\circ$ to $180^\circ$), physiological intraocular pressure ranges (4–70 mmHg), valid Snellen denominators (including metric 6m denominators $4, 5, 6, 7.5, 9, 12, 15, 60$ and low-vision $300$ and $400$), central corneal thickness (300–850 µm), TBUT (1–60 s), optic nerve cup-to-disc ratios (0.0–1.0), and pupillary diameters (1.0–9.0 mm).
+   - Validates diopter increments (must be in 0.25 D steps), cylinder sign conventions, and astigmatic axes ($1^\circ$ to $180^\circ$). A non-zero cylinder requires an axis even when a sphere is already present; a zero cylinder is a spherical lens and needs no axis. An axis dictated on the next turn still completes that cylinder (`"-3 - 1."` then `"120."`). Also validates physiological intraocular pressure ranges (4–70 mmHg), valid Snellen denominators (including metric 6m denominators $4, 5, 6, 7.5, 9, 12, 15, 60$ and low-vision $300$ and $400$), central corneal thickness (300–850 µm), TBUT (1–60 s), optic nerve cup-to-disc ratios (0.0–1.0), and pupillary diameters (1.0–9.0 mm).
    - Locale-specific acuity boundary guards enforce physiological limits for Monoyer decimal scale (`1/20`, `1/10` to `10/10`), Parinaud French near acuity (`P1.5` to `P14`), Jaeger Italian/Spanish near acuity (`J1` to `J7`, with `+`/`-` modifiers), and German DIN 58220 decimal Visus (`1,0` to `0,05`), Nieden (`N1` to `N8`), and Birkhäuser (`B1` to `B6`) near reading scales.
 
 4. **Speech-to-Text (ASR) Acoustic Artifact Resilience & Speech Dysfluency Preprocessor**:
@@ -76,6 +81,30 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - Multi-turn contralateral refraction stitching: Correctly normalizes split turns (`"-3 - 1."` $\rightarrow$ `OS -3.00 -1.00`, `"120."` $\rightarrow$ `x 120`, `"-325."` $\rightarrow$ `OS -3.25.`, `"3.25."` $\rightarrow$ `OS -3.25.`, `"2.5 -, .75 at 90"` $\rightarrow$ `OD -2.50 -0.75 x 090`) while maintaining turn-by-turn timestamps and dialogue boundaries
    - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
 
+    - **Master Clinical Exam Catalog & Intelligent ASR Matcher (`exam_catalog.py`)**:
+      - Master taxonomy of 26 core optometric & ophthalmic examinations across 7 clinical categories (Refraction & Vision, Tonometry & Glaucoma, Anterior Segment, Binocular & Motility, Pupils, Posterior Segment, Contact Lens) indexed with LOINC, SNOMED-CT, CPT, canonical nomenclature, and acoustic speech variations. Catalog LOINC codes match the FHIR observation constants, including tear breakup time `71811-4`, pupils `80315-5`, and cup-to-disc `70949-3`.
+      - **Intelligent Phonetic & Fuzzy Sequence Matcher (`intelligent_match_exam`, `lookup_exam(..., fuzzy=True)`)**:
+        - Resolves unscripted and unseen speech recognition phonetic slips to their canonical clinical procedures via SequenceMatcher fuzzy ratio with calibrated threshold gating ($\ge 0.78$):
+          - *"manifest refractionist"* / *"manif refractor"* / *"manif refraction"* / *"manifest fractor"* $\rightarrow$ `manifest refraction` (SNOMED `252886007` / CPT `92015`)
+          - *"manifestion refraction"* / *"money refraction"* / *"many refraction"* / *"manifast refraction"* $\rightarrow$ `manifest refraction`
+          - *"visual quality"* / *"visual equity"* $\rightarrow$ `visual acuity` (LOINC `8629-0`, distance visual acuity)
+          - *"tomate meter"* / *"tomato meter"* / *"tonomiter"* $\rightarrow$ `tonometer` (LOINC `55284-4` / SNOMED `252859005`)
+          - *"carrot ometry"* / *"care atometry"* $\rightarrow$ `keratometry` (LOINC `8626-6` / SNOMED `252882009`)
+          - *"pack symmetry"* / *"pachy metry"* / *"pocket metry"* $\rightarrow$ `pachymetry` (LOINC `71813-0` / CPT `76514`)
+          - *"split lamp"* / *"slit lab"* $\rightarrow$ `slit lamp` (SNOMED `252800007` / CPT `92004`)
+          - *"fundus copy"* $\rightarrow$ `fundoscopy` (SNOMED `252832004` / CPT `92201`)
+          - *"psycho plegic"* / *"cycle plegic"* $\rightarrow$ `cycloplegic` (SNOMED `252888008`)
+          - *"nuclear balance"* / *"binocular ballast"* $\rightarrow$ `binocular balance` (SNOMED `252891004`)
+          - *"gonio scopy"* $\rightarrow$ `gonioscopy` (SNOMED `65408006` / CPT `92020`)
+          - *"written copy"* / *"retina scopy"* $\rightarrow$ `retinoscopy` (SNOMED `39155005`)
+        - **Strict Negative Discrimination**: Non-exam phrases (e.g. *"the patient spent money on glasses"*, *"blood pressure check"*, *"patient has manifest anxiety"*) yield scores below threshold and are never falsely modified (0.00% false replacement rate).
+      - The preprocessor calls the matcher only after the pinned acoustic regexes, so gold strings such as `tonometer` and `manifest refraction` stay put. Running text uses a stricter compound cutoff ($\ge 0.92$) than isolated lookup ($\ge 0.78$). Already-correct spacing variants (`auto refraction`, `auto refractor`) are aliases and are not rewritten. Residual slips such as *"gonyo scopy"* still become `gonioscopy`.
+      - Seamlessly anchors downstream measurement parsing (e.g., *"I focus now on the manifestion refraction minus 2.00 minus 0.50 axis 180 for the right eye"* $\rightarrow$ `I focus now on the manifest refraction OD -2.00 -0.50 x 180`) while repairing standalone exam announcements into standardized terminology without modifying adjacent narrative text.
+    - **Anatomy Collocation Matcher (`anatomy_catalog.py`)**: Rewrites a structure or finding only as a collocation, never a diagnosis standing alone. *"corners otherwise clear"* $\rightarrow$ `corneas otherwise clear`, *"conjunctivitis quiet"* $\rightarrow$ `conjunctiva quiet`, *"interior chamber"* $\rightarrow$ `anterior chamber`, *"my bohemian glands"* $\rightarrow$ `meibomian glands`, *"nuclear salad"* $\rightarrow$ `nuclear sclerosis`, *"drew zen"* / *"drew sin"* $\rightarrow$ `drusen`. *"viral conjunctivitis"*, *"corners of the room"*, and *"nuclear family"* stay verbatim. Grading regexes then see the canonical English.
+    - **Ocular Medication Matcher (`medications_catalog.py`)**: Small pinned catalog (latanoprost, timolol, brimonidine, dorzolamide, prednisolone / Pred Forte, proparacaine, tropicamide, Systane, aflibercept, ranibizumab) with drug class and RxNorm ingredient CUIs. Short tokens match only inside an ocular window (`drop`, `eye`, `OU`/`OD`/`OS`, `bid`/`qd`). *"latte no prost drops"* $\rightarrow$ `latanoprost`. *"six stain on the shirt"* and a person named Tim stay verbatim. French, German, Italian, and Spanish aliases cover structure names and INN drug names; English number homophones do not run on those locales.
+    - **English Number & Laterality Homophones (`number_words.py`, `refraction_repair.py`)**: Context-gated, English only. `minus`/`plus` + `to`/`too` + a diopter tail becomes `two`; `for` in the same frame becomes `four`; `axis` + `won` + a tens word becomes `one`; `right`/`left` + `guy` becomes `eye` only beside a refraction or acuity token; `oh dee` / standalone `ode` becomes `OD` as laterality. *"I went to fifty appointments"*, *"plus for the patient"*, *"axis won the game"*, and *"he owed"* stay verbatim. Every substitution is recorded on `SpanCoordinateMapper` so `original_text[raw_start:raw_end]` equals the spoken span.
+
+
 5. **Reversible Audit Trail**:
    - Performs non-destructive in-place character offset span replacement.
    - Produces a granular audit log recording `start`, `end`, `original_text`, `replacement_text`, `finding_type`, `rule_or_model_id`, and clinician review status.
@@ -90,7 +119,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
        - **Legacy Refraction Panel**: LOINC `28634-4` with UCUM `[diop]` / `deg`.
      - **Contact Lens Prescription & Evaluation**: LOINC `57077-0` (*Contact lens prescription*), Base Curve (`57078-8`), Diameter (`57079-6`), and Over-Refraction (`95383-6`).
      - **Prism Prescription**: LOINC `28641-9` with UCUM `[p'diop]`
-     - **Keratometry Curvature Panel**: LOINC `8626-6` (Flat K LOINC `8627-4`, Steep K LOINC `8628-2`)
+     - **Keratometry Curvature Panel**: LOINC `8626-6` (Flat K LOINC `8627-4`, Steep K LOINC `8628-2`). Principal meridians are degree components on the same Observation (`flat-meridian`, `steep-meridian`, UCUM `deg`) from `urn:optonorm:fhir:CodeSystem:keratometry-meridian`. Panel `8626-6` has no axis child. LOINC panel `95298-6` lists laterality-specific Axis and Axis 2 (`28975-1`, `28977-7`, `28985-0`, `28987-6`), which are not flat versus steep meridians, so those codes are not used.
      - **Corneal Pachymetry (CCT)**: LOINC `71813-0` with UCUM `um`
      - **Tear Breakup Time (TBUT)**: LOINC `71811-4` with UCUM `s`
      - **Intraocular Pressure (Tonometry)**: LOINC `55284-4` with UCUM `mm[Hg]`
@@ -100,13 +129,14 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - **Strabismus & Binocular Alignment**: LOINC `70951-9` with UCUM `[p'diop]`
      - **Laterality**: SNOMED-CT `28400003` (Right eye), `28400004` (Left eye), `28400005` (Both eyes)
      - **Diagnostic Document Packaging**: LOINC `11528-7` (DiagnosticReport) packaged into FHIR Composition and Consultation Document Bundles
+     - **Ocular Medications**: FHIR R4 `MedicationStatement` with an RxNorm coding (`http://www.nlm.nih.gov/research/umls/rxnorm`) when the catalog entry has an ingredient CUI. Systane is exported as text only. Other findings stay Observations.
    - *Note: `http://loinc.org`, `http://snomed.info/sct`, and `http://unitsofmeasure.org` are canonical namespace URIs, not network endpoints. OptoNorm operates 100% offline with zero external network calls or API token requirements.*
 
 7. **Multilingual (i18n) Foundation & French / Italian / Spanish / German Clinical Providers**:
    - **Pluggable `LocaleProvider` Interface**: Isolates locale-specific dictionaries (spoken number words, ASR elisions, laterality synonyms, and clinical keywords) from core parsing logic.
-   - **French Clinical Language Provider (`FrenchLocaleProvider`)**: Complete support for European and Canadian French clinical transcripts. Supports French vigesimal spoken numbers (`soixante-dix`, `quatre-vingts`, `quatre-vingt-dix`, Swiss/Belgian `septante`, `nonante`), decimal dictations (`deux virgule cinquante`, `moins deux cinquante`, `et demi`), Monoyer distance visual acuity (`10/10` to `1/20`) and Parinaud near visual acuity (`P1.5` to `P14`), French tonometry, keratometry, corneal pachymetry, TBUT, prism base directions (`BT` $\rightarrow$ `BO`, `BN` $\rightarrow$ `BI`, `BS` $\rightarrow$ `BU`, `BI` $\rightarrow$ `BD`), and French clinical abbreviations.
-   - **Italian Clinical Language Provider (`ItalianLocaleProvider`)**: Complete support for Italian clinical transcripts. Supports Italian spoken compound numbers (`quarantatré`, `cinquecentoquaranta`), decimals (`virgola`, `due cinquanta`, `zero settantacinque`, `e mezzo` / `e mezza`), Decimi distance visual acuity (`10/10` to `1/20`, modifiers `-2`, `+1`, pinhole `al foro stenopeico`), Jaeger near reading scale (`J1` to `J7`), Italian subjective refraction (`sfera`, `cilindro`, `asse`, `addizione per vicino`), Italian tonometry (`pressione intraoculare`, `tono oculare`, `PIO`), ultrasound corneal pachymetry (`pachimetria corneale`, `spessore corneale centrale`), tear breakup time (`tempo di rottura del film lacrimale`, `break up time`), keratometry (`cheratometria`, `curvatura corneale`), prism bases (`base esterna` / `base temporale` $\rightarrow$ `BO`, `base interna` / `base nasale` $\rightarrow$ `BI`, `base superiore` $\rightarrow$ `BU`, `base inferiore` / `BI` $\rightarrow$ `BD`), and Italian clinical abbreviations.
-   - **Spanish Clinical Language Provider (`SpanishLocaleProvider`)**: Complete support for Spanish clinical transcripts. Supports Spanish cardinal and compound numbers (`cuarenta y tres`, `quinientos cuarenta`, `ciento ochenta`), decimals (`coma`, `con`, `dos cincuenta`, `cero setenta y cinco`, `y medio` / `y media`), Décimas distance visual acuity (`10/10` to `1/20`, modifiers `-2`, `+1`, pinhole `al agujero estenopeico`), Jaeger near reading scale (`J1` to `J7`), Spanish subjective refraction (`esfera`, `cilindro`, `eje`, `adición para cerca`, `plano`), Spanish tonometry (`presión intraocular`, `tono ocular`, `PIO`), ultrasound corneal pachymetry (`paquimetría corneal`, `espesor corneal central`), tear breakup time (`tiempo de rotura de la película lagrimal`, `tbut`), keratometry (`queratometría`, `curvatura corneal`), prism bases (`base temporal` / `base externa` $\rightarrow$ `BO`, `base nasal` / `base interna` $\rightarrow$ `BI`, `base superior` $\rightarrow$ `BU`, `base inferior` / `BI` $\rightarrow$ `BD`), and Spanish clinical abbreviations.
+   - **French Clinical Language Provider (`FrenchLocaleProvider`)**: Complete support for European and Canadian French clinical transcripts. Supports French vigesimal spoken numbers (`soixante-dix`, `quatre-vingts`, `quatre-vingt-dix`, Swiss/Belgian `septante`, `nonante`), decimal dictations (`deux virgule cinquante`, `moins deux cinquante`, `et demi`), Monoyer distance visual acuity (`10/10` to `1/20`) and Parinaud near visual acuity (`P1.5` to `P14`), French tonometry, keratometry, corneal pachymetry, TBUT, prism base directions (`BT` $\rightarrow$ `BO`, `BN` $\rightarrow$ `BI`, `BS` $\rightarrow$ `BU`; bare `bi` is `BD` in vertical context, `BI` in horizontal context, and reviewed when ambiguous), and French clinical abbreviations.
+   - **Italian Clinical Language Provider (`ItalianLocaleProvider`)**: Complete support for Italian clinical transcripts. Supports Italian spoken compound numbers (`quarantatré`, `cinquecentoquaranta`), decimals (`virgola`, `due cinquanta`, `zero settantacinque`, `e mezzo` / `e mezza`), Decimi distance visual acuity (`10/10` to `1/20`, modifiers `-2`, `+1`, pinhole `al foro stenopeico`), Jaeger near reading scale (`J1` to `J7`), Italian subjective refraction (`sfera`, `cilindro`, `asse`, `addizione per vicino`), Italian tonometry (`pressione intraoculare`, `tono oculare`, `PIO`), ultrasound corneal pachymetry (`pachimetria corneale`, `spessore corneale centrale`), tear breakup time (`tempo di rottura del film lacrimale`, `break up time`), keratometry (`cheratometria`, `curvatura corneale`), prism bases (`base esterna` / `base temporale` $\rightarrow$ `BO`, `base interna` / `base nasale` $\rightarrow$ `BI`, `base superiore` $\rightarrow$ `BU`, `base inferiore` $\rightarrow$ `BD`; bare `bi` is `BD` in vertical context, `BI` in horizontal context, and reviewed when ambiguous), and Italian clinical abbreviations.
+   - **Spanish Clinical Language Provider (`SpanishLocaleProvider`)**: Complete support for Spanish clinical transcripts. Supports Spanish cardinal and compound numbers (`cuarenta y tres`, `quinientos cuarenta`, `ciento ochenta`), decimals (`coma`, `con`, `dos cincuenta`, `cero setenta y cinco`, `y medio` / `y media`), Décimas distance visual acuity (`10/10` to `1/20`, modifiers `-2`, `+1`, pinhole `al agujero estenopeico`), Jaeger near reading scale (`J1` to `J7`), Spanish subjective refraction (`esfera`, `cilindro`, `eje`, `adición para cerca`, `plano`), Spanish tonometry (`presión intraocular`, `tono ocular`, `PIO`), ultrasound corneal pachymetry (`paquimetría corneal`, `espesor corneal central`), tear breakup time (`tiempo de rotura de la película lagrimal`, `tbut`), keratometry (`queratometría`, `curvatura corneal`), prism bases (`base temporal` / `base externa` $\rightarrow$ `BO`, `base nasal` / `base interna` $\rightarrow$ `BI`, `base superior` $\rightarrow$ `BU`, `base inferior` $\rightarrow$ `BD`; bare `bi` is `BD` in vertical context, `BI` in horizontal context, and reviewed when ambiguous), and Spanish clinical abbreviations.
    - **German Clinical Language Provider (`GermanLocaleProvider`)**: Complete support for German clinical transcripts. Supports German inverted compound numbers (`einundzwanzig`, `fünfundvierzig`, `einhundertachtzig`, `fünfhundertvierzig`), decimals (`Komma`, `zwei fünfzig`, `null fünfundsiebzig`, `einundeinhalb` / `eineinhalb`, `einviertel`, `dreiviertel`), DIN 58220 decimal Visus (`1,0` to `0,05`, modifiers `-2`, `+1`, pinhole `mit stenopäischer Lücke`), Nieden (`N1` to `N8`), Birkhäuser (`B1` to `B6`), and Jaeger (`J1` to `J7`) near reading scales, German subjective refraction (`Sphäre`/`Sph`, `Zylinder`/`Zyl`, `Achse`/`A`, `Nahzusatz`/`Add`), German tonometry (`Augeninnendruck`, `IOD`, `Applanationstonometrie`), ultrasound corneal pachymetry (`Hornhautdicke`, `Pachymetrie`, `CCT`), tear breakup time (`Tränenfilm-Aufreißzeit`, `TBUT`), keratometry (`Hornhautkrümmung`, `Ophthalmometrie`), prism base directions (`Basis temporal`/`außen` $\rightarrow$ `BO`, `Basis nasal`/`innen` $\rightarrow$ `BI`, `Basis oben` $\rightarrow$ `BU`, `Basis unten` $\rightarrow$ `BD`), German laterality (`RA`/`LA`/`BA`), and German clinical abbreviations.
    - **Abstract Parametric Grammar Templates (`templates.py`)**: Defines universal medical syntax topologies once across Western languages, binding lexical token sets dynamically with compiled regex caching for zero latency overhead (0.38 ms).
    - **Zero-Dependency Clinical Language Detection (`detector.py`)**: Automatically infers transcript language (`en`, `fr`, `it`, `es`, `de`) via high-speed clinical keyword heuristics when invoked with `locale=Locale.AUTO`.
@@ -120,10 +150,11 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Interactive Documentation**: Auto-generated Swagger UI (`/docs`) and ReDoc (`/redoc`) with pre-configured clinical examples across all supported languages.
 
 9. **Real-Time Streaming & Ambient Scribing (Chunked ASR)**:
-   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds with variable window sizes, token lookahead guards, and multilingual discourse boundaries across English, French, Italian, Spanish, and German without corrupting shorthand across chunk boundaries.
+   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds and commits a finding only at a real sentence boundary (`.?!` or a newline) or on flush. Conjunctions (`and`, `et`, `e`, `y`, `und`) and fixed phrases stay pending, so a bilateral measurement or an optional phrase tail is normalized with the rest of the sentence.
    - **Symmetrical Bilateral Holdback**: Automatically holds back uncommitted unilateral findings (IOP, Pachymetry, TBUT) across speech pauses, waiting for potential contralateral clauses before committing canonical binocular `OU` shorthand or monocular `OD`/`OS`.
    - **Bidirectional Offset Tracking (`OffsetTracker`)**: Maintains coordinate mappings between raw incoming ASR stream offsets and normalized shorthand indices across non-destructive span edits, allowing downstream UI components to map audio-aligned timestamps to transformed text.
    - **Zero-Latency Narrative Flushing**: Immediately emits conversational ambient prose outside clinical slots without buffering delays, preserving doctor-patient dialogue 100% verbatim.
+   - **Flush Reconcile**: Ending the session runs `normalize()` once on the full raw transcript and emits a `reconcile` event with that note, the batch edits, the detected language, clinical alerts, and a FHIR R4 transaction bundle (`include_alerts`, composite refraction). The finished stream matches the batch form.
    - **Native Streaming Transport**: Full support for real-time WebSockets (`/v1/normalize/stream`), Server-Sent Events (`/v1/normalize/sse`), and piped CLI streaming (`optonorm --stream`).
 
 10. **Interactive Clinical Web Playground (React 19 & Redux Toolkit)**:
@@ -133,10 +164,13 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
     - **HL7 FHIR R4 Inspector & US Core 6.1.0 Consultation Note**: Interactive JSON tree viewer for discrete Observation bundles alongside rich human-readable XHTML consultation notes with one-click export (JSON / HTML) and print-ready layouts.
 
 11. **Clinical Decision Support (CDS) & Sight-Threatening Red-Flag Triage Engine**:
-    - **Glaucoma Asymmetry Alert**: Detects cup-to-disc ratio asymmetry $\ge 0.20$ or monocular C/D $\ge 0.65$ (`CDS_GLAUCOMA_ASYMMETRY`, Warning).
+    - **Glaucoma Asymmetry Alert**: Detects cup-to-disc ratio asymmetry $\ge 0.20$ (`CDS_GLAUCOMA_ASYMMETRY`, Warning; Critical Urgent when asymmetry $\ge 0.30$ or either ratio $\ge 0.85$). The rationale says “vertical” only when both vertical meridians were parsed, and “scalar” for a pair of scalar ratios.
+    - **Enlarged Cup Alert**: Flags a scalar ratio, or a parsed vertical meridian, at the shared $\ge 0.65$ cutoff (`CDS_GLAUCOMA_LARGE_CUP`, Warning). The rationale names “scalar” or “vertical” to match the component that was parsed.
     - **Hyper-Acute IOP / Angle-Closure Alert**: Flags intraocular pressure $\ge 30\text{ mmHg}$ (`CDS_ELEVATED_IOP_CRITICAL`, Critical Urgent).
-    - **Retinal Detachment / Tear Suspect**: Flags symptom triad of flashes, floaters, and curtain/veil (`CDS_RETINA_TEAR_SUSPECT`, Critical Urgent).
+    - **Retinal Detachment / Tear Suspect**: Flags flashes paired with floaters, or a curtain/veil (`CDS_RETINA_TEAR_SUSPECT`, Critical Urgent).
+    - **Acute Floater Alert**: Flags floaters qualified by new, sudden, or shower (`CDS_NEW_FLOATERS_WARNING`, Warning). Chronic floaters alone do not alert.
     - **Pediatric Amblyopia Risk**: Flags spherical equivalent anisometropia $> 1.50\text{ D}$ in pediatric patients (`CDS_AMBLYOPIA_RISK`, Warning).
+    - **Beta-Blocker and Asthma / COPD**: A timolol (beta-blocker) medication slot plus asthma or COPD in the original transcript raises `CDS_BETA_BLOCKER_ASTHMA` (Warning). The alert does not rewrite the narrative.
     - Synchronizes alerts as FHIR `Flag` resources conforming to US Core standards.
 
 12. **Epic Hyperspace & EHR Dotphrase Macro Exporter (`.OPTOEXAM`)**:
@@ -159,7 +193,7 @@ flowchart TD
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
         API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
-        PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Acoustic Phonetic Repair · Refraction & Diopter Repair]
+        PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Pinned Acoustic Repair, English only · Locale Exam, Anatomy & Medication Matchers<br/>English Homophones · Past Copulas fr, de, it, es · Refraction & Diopter Repair]
         C[Candidate Span Extractors]
         
         subgraph Grammars & Lexicon
@@ -174,9 +208,11 @@ flowchart TD
             C --> D9[Slit Lamp Grading Grammar<br/>LOCS III Cataract, SUN AC Cells/Flare, SPK]
             C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Phorias, Tropias, Ortho]
             C --> D11[Fixed Clinical Phrase Lexicon]
+            C --> D12[Contact Lens Grammar<br/>Specs, Brand, Modality, Over-Refraction]
+            C --> D13[Master Catalogs & Intelligent Matchers<br/>Exams, Anatomy, Medications & Contact Lenses]
         end
 
-        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 --> E[Post-Hoc Verification Pipeline]
+        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 & D12 & D13 --> E[Post-Hoc Verification Pipeline]
 
         subgraph Safety Guards
             E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
@@ -232,6 +268,7 @@ The URI `http://loinc.org` explicitly declares to receiving EHR systems (e.g., E
 | **LOINC** | `http://loinc.org` | Regenstrief Institute | Clinical measurements, panels, exam observations (Visual Acuity, Refraction, Tonometry, CCT) | **Free worldwide license** under Regenstrief terms. Free to embed in software products without fees or tokens. |
 | **SNOMED CT** | `http://snomed.info/sct` | SNOMED International | Anatomical sites & laterality (`Right eye`, `Left eye`), qualitative findings, correction state | **Free in Member Countries** (US, UK, Germany, Canada, Australia, Spain, Netherlands, Switzerland, etc.). Foundational concept references are royalty-free. |
 | **UCUM** | `http://unitsofmeasure.org` | Regenstrief / UCUM Organization | Standardized clinical units of measure (`[diop]`, `deg`, `mm[Hg]`, `um`, `s`, `[p'diop]`) | **Public domain / Open Source**. Completely free to use without registration or fees. |
+| **Keratometry meridians** | `urn:optonorm:fhir:CodeSystem:keratometry-meridian` | OptoNorm | Flat and steep principal meridians (`flat-meridian`, `steep-meridian`) in degrees on the keratometry Observation | Local code system, embedded offline. Used because LOINC panel `8626-6` has no axis member. |
 
 ### 3. Internal Architecture & Zero-Token Runtime
 
@@ -608,7 +645,8 @@ optonorm/
 │       │   ├── __init__.py         # Public exports (create_app, optonorm_router, get_optonorm_router)
 │       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
-│       │   └── schemas.py          # Pydantic v2 request/response schemas with clinical examples
+│       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
+│       │   └── settings.py         # OPTONORM_CORS_ORIGINS and OPTONORM_MAX_TRANSCRIPT_LENGTH
 │       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
 │       │   ├── __init__.py         # Pipeline entrypoint (preprocess_transcript)
 │       │   ├── tracker.py          # SpanCoordinateMapper non-destructive offset tracker
@@ -625,6 +663,7 @@ optonorm/
 │       ├── grammars/
 │       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
+│       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
 │       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
@@ -648,6 +687,11 @@ optonorm/
 │       │       ├── es.py           # Spanish locale provider (Décimas, Jaeger, compound numbers, clinical tokens)
 │       │       └── de.py           # German locale provider (DIN 58220 decimal Visus, Nieden/Birkhäuser, compound numerals)
 │       └── lexicon/
+│           ├── __init__.py         # Lexicon exports and registry
+│           ├── anatomy_catalog.py  # Ocular anatomy collocation catalog and SequenceMatcher repairs
+│           ├── contact_lens_catalog.py # Master contact lens catalog (35+ commercial brands, FDA groups, Dk/t, specs, phonetic matcher)
+│           ├── exam_catalog.py     # Master clinical exam catalog & registry (26 procedures, LOINC/SNOMED/CPT metadata)
+│           ├── medications_catalog.py # Pinned ocular medication catalog, RxNorm CUIs, ocular-window matcher
 │           ├── phrases.py          # Fixed clinical phrase matcher (English)
 │           ├── phrases_fr.py       # Fixed clinical phrase entries (French)
 │           ├── phrases_it.py       # Fixed clinical phrase entries (Italian)
@@ -655,11 +699,18 @@ optonorm/
 │           └── phrases_de.py       # Fixed clinical phrase entries (German)
 ├── tests/
 │   ├── test_accuracy_and_fixes_transcripts.py # Real-world transcript accuracy, clinical shorthands & dysfluency regression tests
+│   ├── test_acoustic_repair_exams.py # Unit and integration tests for clinical exam acoustic malapropism repairs
 │   ├── test_alignment.py           # Unit tests for strabismus and binocular alignment grammar
+│   ├── test_anatomy_catalog.py     # Anatomy collocation repairs and 50-sentence negative battery
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
 │   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
 │   ├── test_cd_ratio.py            # Unit tests for dynamic C/D ratio grammar and FHIR mapping
 │   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
+│   ├── test_clinical_alerts.py     # Clinical Decision Support (CDS) rule evaluation & critical triage tests
+│   ├── test_contact_lens.py        # Contact lens parameters, over-refraction, and vertex distance tests
+│   ├── test_contact_lens_catalog.py# Master contact lens catalog, acoustic repair, and zero-false-positive tests
+│   ├── test_dotphrase.py           # Dotphrase expander & auto-complete tests
+│   ├── test_exam_catalog.py        # Unit tests for Master Clinical Exam Catalog, categories & metadata
 │   ├── test_fhir.py                # FHIR R4 Bundle and Observation tests
 │   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
 │   ├── test_grading.py             # Unit tests for biomicroscopy and slit lamp severity grading
@@ -670,6 +721,7 @@ optonorm/
 │   ├── test_i18n_fr.py             # French locale unit and transcript integration tests
 │   ├── test_i18n_it.py             # Italian locale unit and transcript integration tests
 │   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
+│   ├── test_medications_catalog.py # Medication matcher, beta-blocker alert, FHIR MedicationStatement, negative battery
 │   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
 │   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
@@ -682,7 +734,7 @@ optonorm/
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
 │   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
-│   ├── test_streaming.py           # Comprehensive chunked simulation suite (split tokens, bilateral pauses, 19 transcripts)
+│   ├── test_streaming.py           # Chunked simulation plus word-chunk parity for every visit transcript
 │   └── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
 ├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
 │   ├── src/
@@ -744,8 +796,8 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (282 tests)
-make test-streaming # Run real-time streaming & ambient scribing test suite (48 tests)
+make test           # Run complete test suite with pytest (783 tests)
+make test-streaming # Run real-time streaming & ambient scribing test suite (59 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
 make web-install    # Install web playground dependencies (npm install in web/)
@@ -819,13 +871,15 @@ uv run pytest -v
 ### 5. Run the Gold Benchmark Evaluation & Slot-Level IE Metrics
 
 ```bash
-# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 682 utterances) with slot-level Precision/Recall/F1
+# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 682 utterances) with slot-level Precision/Recall/F1.
+# Exits 0 only when utterance accuracy is 100% and the invented-number count is 0.
+# An accuracy drop or any invented number exits 1 (this is the CI gold-benchmark gate).
 uv run python scripts/benchmark_eval.py --locale all
 
 # Or run for a specific locale
 uv run python scripts/benchmark_eval.py --locale fr
 
-# Run adversarial noisy ASR benchmark suite (155 utterances)
+# Run adversarial noisy ASR benchmark suite (155 utterances). Same exit gate as the gold set.
 uv run python scripts/benchmark_eval.py --noisy
 
 # Export comprehensive markdown report for CI/CD audit gates
@@ -908,7 +962,7 @@ Transforms clinical transcripts into HL7 FHIR R4 resources. You can test this in
 
 ##### Option A: Standard HL7 FHIR Transaction Bundle (Default)
 
-Generates discrete `Observation` resources ready for EHR ingestion:
+Generates discrete `Observation` resources ready for EHR ingestion. Spoken ocular medications are exported as `MedicationStatement` resources with an RxNorm coding when one is pinned. Clinical Decision Support `Flag` resources are included by default (`include_alerts` defaults to `true`). Pass `"include_alerts": false` to omit the flags:
 
 ```bash
 curl -X POST http://localhost:8000/v1/fhir \
@@ -964,11 +1018,11 @@ curl -X POST http://localhost:8000/v1/fhir \
 
 #### 3. `GET /v1/locales`
 
-Lists supported language codes, clinical scales, and default conventions.
+Lists supported language codes (`en`, `fr`, `it`, `es`, `de`), clinical scales, and default conventions. `POST /v1/normalize`, `POST /v1/fhir`, and `GET /v1/normalize/sse` return **422** when `locale` is not one of those codes or `auto`. A region tag such as `de-DE` resolves to `de`. An unknown `Accept-Language` tag is skipped so detection can still run. The WebSocket rejects an unknown `locale` query with close code 1008.
 
 #### 4. `GET /v1/health`
 
-Health probe reporting uptime status, version, and loaded locales.
+Liveness probe reporting process status, version, and loaded locale codes. It does not parse a transcript, so a `200` does not prove the grammars loaded or that a sample note would normalize.
 
 #### 5. `WebSocket /v1/normalize/stream`
 
@@ -997,30 +1051,60 @@ Available actions:
 {
   "event_type": "finding_committed",
   "emitted_text": "VA OD 20/20",
-  "original_span": "2020 right eye",
-  "start": 23,
-  "end": 37,
+  "original_text": "2020 right eye",
   "finding_type": "visual_acuity",
   "slots": {
     "distance_numerator": 20,
     "distance_denominator": 20.0,
     "laterality": "OD"
   },
-  "fhir_observations": [...]
+  "fhir_observations": [],
+  "flagged_for_review": false,
+  "review_reason": null,
+  "error_message": null
 }
 ```
+
+Event types:
+
+- `finding_committed`: verified shorthand written into the note, with FHIR observations when the build succeeds.
+- `review_required`: a guard rejected the proposal. `emitted_text` is the proposed shorthand, `original_text` is the speech that stays in the note, and `flagged_for_review` is true. No FHIR observation is emitted for that span.
+- `error`: a committed finding's FHIR build failed. `error_message` explains the failure instead of returning a silent empty observation list.
+- `narrative_flush`, `interim_update`, and `session_end` cover verbatim speech, unconfirmed ASR hypotheses, and end of encounter.
 
 #### 6. `GET /v1/normalize/sse`
 
 Server-Sent Events (SSE) endpoint providing unidirectional HTTP streaming of normalization events from continuous speech streams.
 
 **Query Parameters**:
-- `transcript`: URL-encoded transcript stream (or periodic query chunks).
+- `text`: URL-encoded transcript chunk. This value, and `patient_id` when supplied, are part of the request URL, so they are copied into access logs, proxy logs, and browser history.
 - `locale`: Optional language (`en`, `fr`, `it`, `es`, `de`, `auto`).
 - `convention`: `international` (default) or `localized`.
+- `patient_id`: Patient identifier. Prefer a non-identifying token; the query string is not a private channel.
 
 ```bash
-curl -N "http://localhost:8000/v1/normalize/sse?transcript=visual%20acuity%202020%20right%20eye.%20IOP%2014%20mmHg%20left%20eye."
+curl -N "http://localhost:8000/v1/normalize/sse?text=visual%20acuity%202020%20right%20eye.%20IOP%2014%20mmHg%20left%20eye."
+```
+
+### Deployment limits
+
+The HTTP surface does not authenticate callers. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` are safe only on a private network, or behind a gateway that adds authentication. This service does not ship an auth framework.
+
+| Control | Default | Tighten with |
+| --- | --- | --- |
+| Browser origins | Any `Origin` is reflected, and `Access-Control-Allow-Credentials` is `true` | `OPTONORM_CORS_ORIGINS` |
+| Transcript length | No character cap | `OPTONORM_MAX_TRANSCRIPT_LENGTH` |
+
+- **CORS.** [`src/opto_normalizer/api/app.py`](src/opto_normalizer/api/app.py) mounts `CORSMiddleware` with `allow_credentials=True`. When `OPTONORM_CORS_ORIGINS` is unset, the allowlist is `*`, and Starlette reflects the request `Origin` on every response. Set a comma-separated allowlist before the port is reachable from a browser you do not control, for example `OPTONORM_CORS_ORIGINS=https://ehr.example,https://scribe.example`.
+- **Transcript cap.** When `OPTONORM_MAX_TRANSCRIPT_LENGTH` is a positive integer, `POST /v1/normalize`, `POST /v1/fhir`, the SSE `text` query, and each WebSocket message are rejected once the character count (including text already held in the streaming buffer) exceeds it. The status is **413**. A non-numeric value fails process startup. The check runs after the body has been read, so a reverse proxy should still set its own body-size limit.
+- **SSE query string.** The transcript and `patient_id` travel in the URL. Do not put real identifiers there.
+- **Event loop.** `POST /v1/normalize` and `POST /v1/fhir` are synchronous routes, so FastAPI runs them in a worker thread. The WebSocket and SSE handlers call `normalize()` on the asyncio event loop. A long streaming transcript stalls other connections on that worker.
+- **Health.** `GET /v1/health` only reports that the process is up.
+
+```bash
+OPTONORM_CORS_ORIGINS=https://ehr.example \
+OPTONORM_MAX_TRANSCRIPT_LENGTH=20000 \
+uv run main.py serve
 ```
 
 ---
@@ -1054,6 +1138,7 @@ OptoNorm includes a modern, production-grade clinical web playground located in 
    - Powered by a centralized Redux Toolkit state machine ([`streamingSlice.ts`](web/src/store/slices/streamingSlice.ts)) fully inspectable in Redux DevTools.
    - Connects over full-duplex WebSockets to `/v1/normalize/stream`, streaming simulated speech tokens at customizable playback rates ($0.5\times$ to $5.0\times$).
    - **Holdback Buffer HUD**: Real-time visualization of unilateral findings held in the buffer across clinician pauses, demonstrating bilateral symmetry synthesis before committing canonical `OU` shorthand.
+   - **Review flags**: A `review_required` event keeps the spoken span in the note, shows the proposed shorthand as flagged in the event feed and clinical diff, and does not write that proposal into the copied shorthand. A FHIR build failure surfaces as an `error` event and an error banner.
 
 3. **Visual Clinical Diff Viewer (`ClinicalDiffViewer.tsx`)**:
    - Dual visualization modes: **Inline** and **Side-by-Side**.
@@ -1111,7 +1196,7 @@ make dev
 make web-dev
 ```
 
-- Vite automatically proxies `/v1` HTTP requests and `/v1/normalize/stream` WebSocket traffic to the local FastAPI server at `http://localhost:8000`.
+- Vite automatically proxies `/v1` HTTP requests and `/v1/normalize/stream` WebSocket traffic to the local FastAPI server at `http://127.0.0.1:8000`.
 
 ---
 
@@ -1119,7 +1204,7 @@ make web-dev
 
 OptoNorm provides multi-stage unprivileged Docker containers for secure enterprise deployment:
 
-- **API Container ([`Dockerfile`](Dockerfile))**: Built on `python:3.13-slim` using `uv`, running as non-root user `optonorm` (UID 10001) on port `8000`.
+- **API Container ([`Dockerfile`](Dockerfile))**: Built on `python:3.13-slim` using `uv`, running as non-root user `optonorm` (UID 10001) on port `8000`. The image installs runtime dependencies only (`uv sync --no-dev`), so pytest is not in the container. Set `OPTONORM_CORS_ORIGINS` and `OPTONORM_MAX_TRANSCRIPT_LENGTH` in the service environment to tighten the open defaults described under [Deployment limits](#deployment-limits). The published port has no authentication.
 - **Web Container ([`web/Dockerfile`](web/Dockerfile))**: Multi-stage build (`node:22-alpine` builder, `nginxinc/nginx-unprivileged:alpine` runner) serving the compiled React 19 SPA on unprivileged port `8080` (mapped to host port `3000`). Reverse proxies API and WebSocket requests with healthcheck dependency on `optonorm-api`.
 
 ```bash
@@ -1197,11 +1282,17 @@ events_2 = buffer.feed("right eye. ")  # Emits finding_committed: 'VA OD 20/20'
 events_3 = buffer.feed("Tonometry was 14 right eye ")  # held in buffer
 events_4 = buffer.feed("and 14 left eye. ")  # Bilateral symmetry detected! Emits 'IOP: 14 OU mmHg'
 
-# End of encounter flush
+# End of encounter flush. The reconcile event is the batch note for the full transcript.
 final_events = buffer.flush()
 for ev in final_events:
-    if ev.event_type.value == "finding_committed":
+    if ev.event_type.value == "reconcile":
+        print(ev.normalized_text)
+    elif ev.event_type.value == "finding_committed":
         print(f"[{ev.finding_type.value}] {ev.emitted_text}")
+    elif ev.event_type.value == "review_required":
+        print(f"[REVIEW] {ev.original_text} -> {ev.emitted_text} ({ev.review_reason})")
+    elif ev.event_type.value == "error":
+        print(f"[ERROR] {ev.error_message}")
 ```
 
 ---
