@@ -5,7 +5,7 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.27.1](https://img.shields.io/badge/version-0.27.1-blue.svg)]()
+[![Version: 0.30.1](https://img.shields.io/badge/version-0.30.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
 [![Tests](https://img.shields.io/badge/tests-804%20passed-brightgreen.svg)]()
@@ -192,6 +192,7 @@ flowchart TD
 
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
         API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
+        AUTH[Authentication and audit<br/>JWT sessions, API keys, role scopes]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
         PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Pinned Acoustic Repair, English only · Locale Exam, Anatomy & Medication Matchers<br/>English Homophones · Past Copulas fr, de, it, es · Refraction & Diopter Repair]
         C[Candidate Span Extractors]
@@ -224,8 +225,8 @@ flowchart TD
         H --> I[Reversible In-Place Span Replacement Engine]
     end
 
-    Client <-->|REST HTTP & Full-Duplex WebSockets<br/>Host :3000 -> Container :8080 / :8000| API
-    API --> B --> PRE --> C
+    Client <-->|REST, WebSocket, Bearer JWT or X-API-Key<br/>Host :3000 -> Container :8080 / :8000| API
+    API --> AUTH --> B --> PRE --> C
     PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
 
     I --> J[Normalized EHR Clinical Text]
@@ -651,12 +652,24 @@ optonorm/
 │       ├── pipeline.py             # Orchestration pipeline, span deduplication, replacement engine
 │       ├── residue.py              # Scans unclaimed spans for colloquial clinical intent
 │       ├── cli.py                  # Standalone console command engine ('optonorm')
+│       ├── auth/                   # Users, API keys, JWT sessions, RBAC, and audit log
+│       │   ├── __init__.py         # Auth package exports
+│       │   ├── permissions.py      # Fixed clinical roles and permission scopes
+│       │   ├── models.py           # User, API key, token, and audit records
+│       │   ├── crypto.py           # Argon2 passwords and SHA-256 API key hashes
+│       │   ├── jwt.py              # Access tokens and single-use stream tickets
+│       │   ├── audit.py            # Append-only audit rows (transcript SHA-256 only)
+│       │   ├── bootstrap.py        # Optional first administrator from the environment
+│       │   ├── commands.py         # `optonorm auth` administration commands
+│       │   └── storage/            # SQLite default store and optional Postgres store
 │       ├── api/                    # Production FastAPI serving & plug-and-play router
 │       │   ├── __init__.py         # Public exports (create_app, optonorm_router, get_optonorm_router)
-│       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware
+│       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware, OpenAPI auth
+│       │   ├── dependencies.py     # Caller resolution and permission checks
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
+│       │   ├── routes_auth.py      # /v1/auth login, refresh, users, API keys, and audit
 │       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
-│       │   └── settings.py         # OPTONORM_CORS_ORIGINS and OPTONORM_MAX_TRANSCRIPT_LENGTH
+│       │   └── settings.py         # CORS, transcript cap, and authentication settings
 │       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
 │       │   ├── __init__.py         # Pipeline entrypoint (preprocess_transcript)
 │       │   ├── tracker.py          # SpanCoordinateMapper non-destructive offset tracker
@@ -714,6 +727,9 @@ optonorm/
 │   ├── test_anatomy_catalog.py     # Anatomy collocation repairs and 50-sentence negative battery
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
 │   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
+│   ├── test_auth_api.py            # Login, refresh, permission gates, API keys, FHIR signing, audit hashes
+│   ├── test_auth_streaming.py      # WebSocket and SSE authentication
+│   ├── test_auth_unit.py           # Password hashes, JWT expiry, role map, stream-ticket single use
 │   ├── test_cd_ratio.py            # Unit tests for dynamic C/D ratio grammar and FHIR mapping
 │   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
 │   ├── test_clinical_alerts.py     # Clinical Decision Support (CDS) rule evaluation & critical triage tests
@@ -749,6 +765,7 @@ optonorm/
 ├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── auth/               # Login modal, user badge, permission gate, user and API key admin
 │   │   │   ├── common/             # Reusable BrandLogo (SVG) and shared UI primitives
 │   │   │   ├── fhir/               # FhirInspector (JSON tree) & ClinicalDocumentView (US Core XHTML)
 │   │   │   ├── form/               # ClinicalInputForm (@tanstack/react-form) & PresetSelector
@@ -756,8 +773,8 @@ optonorm/
 │   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
 │   │   │   └── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
 │   │   ├── data/                   # Multilingual clinical presets across 5 languages
-│   │   ├── lib/                    # TanStack QueryClient setup and LOINC/SNOMED terminology mappings
-│   │   ├── store/                  # Redux Toolkit store (streamingSlice, normalizationSlice, uiSlice)
+│   │   ├── lib/                    # Authenticated fetch client, TanStack QueryClient, terminology mappings
+│   │   ├── store/                  # Redux Toolkit store (authSlice, streamingSlice, normalizationSlice, uiSlice)
 │   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
 │   │   ├── App.tsx                 # Root application cockpit layout
 │   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
@@ -766,6 +783,8 @@ optonorm/
 │   ├── nginx.conf                  # Nginx configuration (SPA fallback + HTTP/WS reverse proxy)
 │   ├── package.json                # Web playground dependencies and scripts
 │   └── vite.config.ts              # Vite configuration with local dev proxy (/v1 -> :8000)
+├── docker/
+│   └── entrypoint.sh               # Creates the auth directory and drops to the optonorm user
 ├── Dockerfile                      # Multi-stage unprivileged production API container
 ├── docker-compose.yml              # Multi-service Docker Compose stack (optonorm-api on :8000, optonorm-web on :3000)
 ├── .dockerignore                   # Build artifact exclusions
@@ -818,6 +837,14 @@ make normalize      # Test clinical normalization via CLI
 make fhir-doc       # Test FHIR R4 consultation document bundle export
 make docker-up      # Start multi-service stack (Web :3000 + API :8000) via Docker Compose
 make clean          # Remove cache and build artifacts
+make auth-init      # Create the authentication database tables
+make auth-list-users
+make auth-create-user USERNAME=dr_roberto ROLE=clinician NAME="Dr. Roberto Rossi"
+make auth-deactivate-user USERNAME=dr_roberto
+make auth-create-key NAME="EHR Ingest Pipeline" ROLE=ehr_service EXPIRES_DAYS=365
+make auth-revoke-key KEY_ID=key_01
+make docker-auth-list-users
+make docker-auth-create-user USERNAME=optoroot ROLE=superuser NAME="Superuser"
 ```
 
 ### 2. Run the Normalizer CLI (`main.py` or `optonorm`)
@@ -1098,13 +1125,24 @@ curl -N "http://localhost:8000/v1/normalize/sse?text=visual%20acuity%202020%20ri
 
 ### Deployment limits
 
-The HTTP surface does not authenticate callers. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` are safe only on a private network, or behind a gateway that adds authentication. This service does not ship an auth framework.
+Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` require a Bearer access token or an `X-API-Key` header. `GET /v1/health` and `GET /v1/locales` stay public. Set `OPTONORM_AUTH_ENABLED=false` to restore the open gateway for a private lab or an existing unauthenticated pipeline.
 
 | Control | Default | Tighten with |
 | --- | --- | --- |
+| Authentication | Required (`OPTONORM_AUTH_ENABLED=true`) | `OPTONORM_AUTH_ENABLED=false` restores the open gateway |
+| JWT secret | Required when authentication is on, at least 32 bytes | `OPTONORM_JWT_SECRET` |
+| Auth database | SQLite file `data/auth.db` | `OPTONORM_AUTH_DB_PATH` or `OPTONORM_AUTH_DATABASE_URL` (`postgresql://`) |
 | Browser origins | Any `Origin` is reflected, and `Access-Control-Allow-Credentials` is `true` | `OPTONORM_CORS_ORIGINS` |
 | Transcript length | No character cap | `OPTONORM_MAX_TRANSCRIPT_LENGTH` |
 
+- **Configuration.** Copy [`.env.example`](.env.example) to `.env` for local commands such as `make dev` and `make auth-init`. Process environment variables override that file. The Docker image does not contain `.env`. Compose, Kubernetes, and systemd should inject the same `OPTONORM_*` names from a secret manager. `OPTONORM_SECRETS_DIR` can point at a directory of secret files named `jwt_secret`, `bootstrap_admin_password`, and `auth_database_url`; environment variables override those files.
+- **Sessions.** `POST /v1/auth/login` checks an Argon2 password hash and returns a 15-minute access JWT. The 7-day refresh token is an `HttpOnly` `SameSite=Lax` cookie named `optonorm_refresh` (path `/v1/auth`). Set `OPTONORM_AUTH_COOKIE_SECURE=true` on HTTPS. `POST /v1/auth/refresh` rotates the cookie. Reuse of a rotated refresh token revokes that user's refresh tokens.
+- **API keys.** `optonorm auth create-key` prints an `opto_live_` or `opto_test_` secret once. Only the SHA-256 hash is stored. Send it as `X-API-Key`. Revocation takes effect on the next request.
+- **Roles.** `superuser` has every permission, including streaming and document signing. `admin` manages users, keys, and configuration and may normalize and export FHIR, but cannot stream or sign. `clinician` normalizes, streams, exports, signs documents, and reads their own audit events. `technician_scribe` normalizes, streams, and exports, but cannot sign. `auditor_billing` exports FHIR and reads the audit log, but cannot normalize or stream. `ehr_service` is the machine role; `--allow-sign` adds document signing to that key only.
+- **Signed FHIR.** `document`, `composition`, and `diagnostic_report` require `fhir:sign`. The author is the caller's `practitioner_id`, and the resource contains a FHIR R4 `Provenance` entry. Transaction and collection bundles require `fhir:export`.
+- **Streams.** Browsers obtain a 60-second single-use ticket from `POST /v1/auth/stream-ticket` and connect to `/v1/normalize/stream?ticket=...`. Non-browser clients may send `Authorization: Bearer`, `X-API-Key`, or `Sec-WebSocket-Protocol: bearer, <token>`. A missing or insufficient credential closes the socket with `1008`.
+- **Audit.** Authenticated clinical requests append an audit row with the actor, role, action, client IP, and a SHA-256 of the transcript. The transcript text is not stored. Clinicians see only their own rows at `GET /v1/auth/audit`. Admins and auditors see every row.
+- **First administrator.** `uv run main.py auth create-user --username admin --role admin --name "System Administrator"` prompts for a password. If `OPTONORM_BOOTSTRAP_ADMIN_PASSWORD` is set and the database has no users, startup creates username `admin`. No default password is built into the image.
 - **CORS.** [`src/opto_normalizer/api/app.py`](src/opto_normalizer/api/app.py) mounts `CORSMiddleware` with `allow_credentials=True`. When `OPTONORM_CORS_ORIGINS` is unset, the allowlist is `*`, and Starlette reflects the request `Origin` on every response. Set a comma-separated allowlist before the port is reachable from a browser you do not control, for example `OPTONORM_CORS_ORIGINS=https://ehr.example,https://scribe.example`.
 - **Transcript cap.** When `OPTONORM_MAX_TRANSCRIPT_LENGTH` is a positive integer, `POST /v1/normalize`, `POST /v1/fhir`, the SSE `text` query, and each WebSocket message are rejected once the character count (including text already held in the streaming buffer) exceeds it. The status is **413**. A non-numeric value fails process startup. The check runs after the body has been read, so a reverse proxy should still set its own body-size limit.
 - **SSE query string.** The transcript and `patient_id` travel in the URL. Do not put real identifiers there.
@@ -1112,9 +1150,31 @@ The HTTP surface does not authenticate callers. `POST /v1/normalize`, `POST /v1/
 - **Health.** `GET /v1/health` only reports that the process is up.
 
 ```bash
+OPTONORM_JWT_SECRET="$(openssl rand -hex 32)" \
 OPTONORM_CORS_ORIGINS=https://ehr.example \
 OPTONORM_MAX_TRANSCRIPT_LENGTH=20000 \
 uv run main.py serve
+```
+
+```bash
+uv run main.py auth init-db
+uv run main.py auth create-user --username dr_roberto --role clinician --name "Dr. Roberto Rossi" --practitioner-id OD-88421
+uv run main.py auth create-key --name "EHR Ingest Pipeline" --role ehr_service --expires-days 365
+uv run main.py auth list-users
+uv run main.py auth revoke-key --key-id key_01
+```
+
+The same commands are available as Make targets. Omit `PASSWORD` and Make prompts for it. Set `ALLOW_SIGN=1` to grant `fhir:sign` on an `ehr_service` key, or `TEST_KEY=1` to issue an `opto_test_` key. `make auth-*` writes to the host database `data/auth.db`. `make docker-auth-*` runs the same commands in the Compose API container, which uses the `optonorm-auth` volume. Sign in through http://localhost:3000 with a user created by `docker-auth-*`.
+
+```bash
+make auth-init
+make auth-create-user USERNAME=dr_roberto ROLE=clinician NAME="Dr. Roberto Rossi" PRACTITIONER_ID=OD-88421
+make auth-create-key NAME="EHR Ingest Pipeline" ROLE=ehr_service EXPIRES_DAYS=365
+make auth-list-users
+make auth-deactivate-user USERNAME=dr_roberto
+make auth-revoke-key KEY_ID=key_01
+make docker-auth-create-user USERNAME=optoroot ROLE=superuser NAME="Superuser"
+make docker-auth-list-users
 ```
 
 ---
@@ -1199,10 +1259,19 @@ For rapid local frontend or backend iteration with hot module replacement (HMR):
 # 1. Install frontend dependencies
 make web-install
 
-# 2. Start FastAPI backend (in Terminal 1)
+# 2. Copy local settings and set OPTONORM_JWT_SECRET to at least 32 bytes
+#    (openssl rand -hex 32). Uncomment OPTONORM_BOOTSTRAP_ADMIN_PASSWORD
+#    to create username admin on an empty database.
+cp .env.example .env
+
+# 3. Start FastAPI backend (in Terminal 1).
+# Authentication is on by default and refuses to start without that secret.
 make dev
 
-# 3. Start Vite React 19 dev server with proxy to :8000 (in Terminal 2)
+# Open gateway for a private lab that does not sign in:
+# OPTONORM_AUTH_ENABLED=false make dev
+
+# 4. Start Vite React 19 dev server with proxy to :8000 (in Terminal 2)
 make web-dev
 ```
 
@@ -1214,7 +1283,7 @@ make web-dev
 
 OptoNorm provides multi-stage unprivileged Docker containers for secure enterprise deployment:
 
-- **API Container ([`Dockerfile`](Dockerfile))**: Built on `python:3.13-slim` using `uv`, running as non-root user `optonorm` (UID 10001) on port `8000`. The image installs runtime dependencies only (`uv sync --no-dev`), so pytest is not in the container. Set `OPTONORM_CORS_ORIGINS` and `OPTONORM_MAX_TRANSCRIPT_LENGTH` in the service environment to tighten the open defaults described under [Deployment limits](#deployment-limits). The published port has no authentication.
+- **API Container ([`Dockerfile`](Dockerfile))**: Built on `python:3.13-slim` using `uv`, running as non-root user `optonorm` (UID 10001) on port `8000`. The image installs runtime dependencies only (`uv sync --no-dev`), so pytest is not in the container. [`docker/entrypoint.sh`](docker/entrypoint.sh) prepares `/app/auth` and drops privileges. Compose interpolates `OPTONORM_JWT_SECRET` from the project `.env` when that variable is set, and otherwise uses a local-only fallback. The image does not contain `.env`. Replace the fallback before any shared deployment. The `optonorm-auth` volume is mounted at `OPTONORM_AUTH_DB_PATH`. Set `OPTONORM_AUTH_ENABLED=false` to restore the open gateway. `OPTONORM_CORS_ORIGINS` and `OPTONORM_MAX_TRANSCRIPT_LENGTH` are described under [Deployment limits](#deployment-limits).
 - **Web Container ([`web/Dockerfile`](web/Dockerfile))**: Multi-stage build (`node:22-alpine` builder, `nginxinc/nginx-unprivileged:alpine` runner) serving the compiled React 19 SPA on unprivileged port `8080` (mapped to host port `3000`). Reverse proxies API and WebSocket requests with healthcheck dependency on `optonorm-api`.
 
 ```bash
