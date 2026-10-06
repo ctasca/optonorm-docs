@@ -5,14 +5,14 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.26.1](https://img.shields.io/badge/version-0.26.1-blue.svg)]()
+[![Version: 0.27.1](https://img.shields.io/badge/version-0.27.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-783%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-804%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.83%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-0.81%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -305,33 +305,37 @@ Tokens and credentials are only relevant when integrating OptoNorm into an exter
 
 ## Performance & Benchmark Metrics
 
-Evaluated on the 682-utterance Multilingual Gold Evaluation Benchmark across English ([`data/gold_set.json`](data/gold_set.json)), French ([`data/gold_set_fr.json`](data/gold_set_fr.json)), Italian ([`data/gold_set_it.json`](data/gold_set_it.json)), Spanish ([`data/gold_set_es.json`](data/gold_set_es.json)), and German ([`data/gold_set_de.json`](data/gold_set_de.json)):
+Evaluated on the 706-utterance Multilingual Gold Evaluation Benchmark across English ([`data/gold_set.json`](data/gold_set.json)), French ([`data/gold_set_fr.json`](data/gold_set_fr.json)), Italian ([`data/gold_set_it.json`](data/gold_set_it.json)), Spanish ([`data/gold_set_es.json`](data/gold_set_es.json)), and German ([`data/gold_set_de.json`](data/gold_set_de.json)):
 
 | Category                           | Gold Items |  Accuracy  | Hallucination Rate | False Replacements | Mean Latency |
 | ---------------------------------- | :--------: | :--------: | :----------------: | :----------------: | :----------: |
-| **Visual Acuity (US, Metric 6m, Decimals)** | 165 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.35 ms |
-| **Refraction (Sphere, Cyl, Axis, Add)**     | 131 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.40 ms |
-| **Intraocular Pressure (IOP)**     |     82     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.32 ms    |
+| **Visual Acuity (US, Metric 6m, Decimals)** | 168 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.35 ms |
+| **Refraction (Sphere, Cyl, Axis, Add)**     | 141 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.40 ms |
+| **Intraocular Pressure (IOP)**     |     85     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.32 ms    |
 | **Fixed Phrases & Slit Lamp**      |    112     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.28 ms    |
 | **Prism & Strabismus**             |     47     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.34 ms    |
 | **Keratometry (K-Readings)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.42 ms    |
 | **Corneal Pachymetry (CCT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.31 ms    |
 | **Tear Breakup Time (TBUT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.30 ms    |
 | **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.15 ms    |
-| **Overall Multilingual System**    |  **682**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.58 ms**  |
+| **Alignment (NPC, AC/A, NRA/PRA)** |      4     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Phrase repairs**                 |      4     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Overall Multilingual System**    |  **706**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.81 ms**  |
 
 ### Slot-Level Information Extraction & Verbatim Integrity Metrics
 
-Evaluated across all 1,266 individual clinical slot values extracted across the 682 utterances:
+Evaluated across all 1,305 individual clinical slot values extracted across the 706 utterances:
 
 | Quality Dimension | Metric Value | Quality Gate | Status |
 |---|:---:|:---:|:---:|
 | **Slot-Level Precision** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
 | **Slot-Level Recall** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
 | **Slot-Level F1-Score** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
-| **Verbatim Narrative Corruption Rate** | **0.0000%** (0 chars altered) | $0.00\%$ | ✅ PASS |
+| **Verbatim Narrative Corruption Rate** | **1.2048%** (52 chars altered) | $0.00\%$ | ❌ FAIL |
 | **Invented Numbers (Hallucination)** | **0.00%** (0 fabricated numbers) | $0.00\%$ | ✅ PASS |
 | **Negative Control False Replacements** | **0.00%** (0 / 52) | $0.00\%$ | ✅ PASS |
+
+De-identified ASR encounters live under [`data/transcripts/asr/`](data/transcripts/asr/): 8 files, one visit each. Five are `deidentified_capture` (English high-noise refraction, cataract glare, binocular vision, and cycloplegic wet refraction, plus the French capture). Three are `asr_pattern_transfer` (Italian, Spanish, and German), which replay the same acuity, swallowed-punctuation, and homophone errors in that locale's number words and acuity scale. They are labeled as transfers, not native recordings. Failing spans from these encounters are promoted into the gold sets above. A real capture replaces names and dates of birth before commit; the loader requires `"deidentified": true` and rejects email addresses, phone numbers, and labeled record numbers (`MRN`, `NHS`, `SSN`, `codice fiscale`).
 
 ---
 
@@ -594,11 +598,11 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 ```text
 optonorm/
 ├── data/
-│   ├── gold_set.json               # 258 curated clinical & negative control utterances (English)
-│   ├── gold_set_fr.json            # 69 curated clinical & negative control utterances (French)
-│   ├── gold_set_it.json            # 61 curated clinical & negative control utterances (Italian)
-│   ├── gold_set_es.json            # 61 curated clinical & negative control utterances (Spanish)
-│   ├── gold_set_de.json            # 111 curated clinical & negative control utterances (German)
+│   ├── gold_set.json               # 266 curated clinical & negative control utterances (English)
+│   ├── gold_set_fr.json            # 107 curated clinical & negative control utterances (French)
+│   ├── gold_set_it.json            # 109 curated clinical & negative control utterances (Italian)
+│   ├── gold_set_es.json            # 108 curated clinical & negative control utterances (Spanish)
+│   ├── gold_set_de.json            # 116 curated clinical & negative control utterances (German)
 │   ├── vocabulary_spec.json        # v2.2.0 Optometric clinical shorthand schema & canonical slot specifications (English)
 │   ├── vocabulary_spec_fr.json     # French clinical shorthand schema & canonical slot specifications
 │   ├── vocabulary_spec_it.json     # Italian clinical shorthand schema & canonical slot specifications
@@ -606,6 +610,12 @@ optonorm/
 │   ├── vocabulary_spec_de.json     # German clinical shorthand schema & canonical slot specifications
 │   ├── noisy_asr_benchmark.json    # 155-item adversarial noisy ASR benchmark suite (negative controls & acoustic noise across 5 languages)
 │   └── transcripts/
+│       ├── asr/                    # De-identified ASR encounters, one JSON file per visit
+│       │   ├── en/                 # 4 deidentified_capture encounters
+│       │   ├── fr/                 # 1 deidentified_capture encounter
+│       │   ├── it/                 # 1 asr_pattern_transfer encounter
+│       │   ├── es/                 # 1 asr_pattern_transfer encounter
+│       │   └── de/                 # 1 asr_pattern_transfer encounter
 │       ├── edge_cases.json         # Curated clinical transcripts covering novel domains (Prism, Keratometry, CCT, TBUT - English)
 │       ├── edge_cases_fr.json      # Curated clinical edge-case transcripts (French)
 │       ├── edge_cases_it.json      # Curated clinical edge-case transcripts (Italian)
@@ -796,7 +806,7 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (783 tests)
+make test           # Run complete test suite with pytest (804 tests)
 make test-streaming # Run real-time streaming & ambient scribing test suite (59 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
@@ -871,7 +881,7 @@ uv run pytest -v
 ### 5. Run the Gold Benchmark Evaluation & Slot-Level IE Metrics
 
 ```bash
-# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 682 utterances) with slot-level Precision/Recall/F1.
+# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 706 utterances) with slot-level Precision/Recall/F1.
 # Exits 0 only when utterance accuracy is 100% and the invented-number count is 0.
 # An accuracy drop or any invented number exits 1 (this is the CI gold-benchmark gate).
 uv run python scripts/benchmark_eval.py --locale all
