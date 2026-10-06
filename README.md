@@ -5,14 +5,14 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.30.1](https://img.shields.io/badge/version-0.30.1-blue.svg)]()
+[![Version: 0.32.0](https://img.shields.io/badge/version-0.32.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-804%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1022%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-0.81%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-1.63%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -51,7 +51,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Slit Lamp Severity & Biomicroscopy Grading**: Cataract opacities (LOCS III: `Lens: 2+ NS, 1+ PSC OU`, `Lens: trace NS OU`, `Lens: 2+ NS, 1+ Cort OD`), anterior chamber cells & flare (SUN standardization: `AC: 1+ cells, trace flare`), and corneal superficial punctate keratitis (`Cornea: 2+ SPK inf OU`, `Cornea: trace SPK`). Discrete FHIR observations with SNOMED CT `414646002` (*Nuclear sclerosis*), LOINC `70950-1` (*Flare anterior chamber of eye*), and SNOMED CT `231872005` (*Superficial punctate keratitis*).
    - **Strabismus & Binocular Alignment**: Cover test distance and near phorias (`CT: dist 4Δ EP, near 8Δ EP`, `CT: dist 4Δ XP, near 10Δ XP`), monocular and alternating tropias (`15Δ LXT`, `20Δ RET`, `10Δ XT`), and orthophoria (`Ortho dist & near`, `Ortho dist`, `Ortho near`, `Ortho`). Discrete FHIR observation with LOINC `70951-9` (*Ocular alignment*).
    - **Clinical Grading & Modifiers**: Standardizes clinical severity grading (`one plus` $\rightarrow$ `1+`, `two plus` $\rightarrow$ `2+`, `three plus` $\rightarrow$ `3+`, `four plus` $\rightarrow$ `4+`, `grade one` $\rightarrow$ `grade 1`).
-   - **Fixed-Phrase Lexicon**: Maps colloquial findings to canonical acronyms (`PERRLA`, `PERRL (-) RAPD`, `EOMI`, `DFE`, `C/D 0.3 OU`, `AC: D&Q OU, no c/f`, `Lens: trace NS OU`, `Cornea: clear OU`).
+   - **Fixed-Phrase Lexicon**: Maps colloquial findings to canonical acronyms (`PERRLA`, `PERRL (-) RAPD`, `EOMI`, `DFE`, `DFE: normal`, `C/D 0.3 OU`, `AC: D&Q OU, no c/f`, `Lens: trace NS OU`, `Cornea: clear OU`, `Macula: flat, dry OU`, `Retina: flat, intact OU`, `Vitreous: clear OU`, `Conjunctiva: quiet OU`, `Iris: normal pattern OU`, `Lids/Lashes: clear OU`).
 
 2. **Zero-Hallucination Guarantee (Post-Hoc Mathematical Entailment Guard)**:
    - Evaluates every generated shorthand token against the source speech span.
@@ -306,33 +306,36 @@ Tokens and credentials are only relevant when integrating OptoNorm into an exter
 
 ## Performance & Benchmark Metrics
 
-Evaluated on the 706-utterance Multilingual Gold Evaluation Benchmark across English ([`data/gold_set.json`](data/gold_set.json)), French ([`data/gold_set_fr.json`](data/gold_set_fr.json)), Italian ([`data/gold_set_it.json`](data/gold_set_it.json)), Spanish ([`data/gold_set_es.json`](data/gold_set_es.json)), and German ([`data/gold_set_de.json`](data/gold_set_de.json)):
+Evaluated on the 907-utterance Multilingual Gold Evaluation Benchmark across English ([`data/gold_set.json`](data/gold_set.json)), French ([`data/gold_set_fr.json`](data/gold_set_fr.json)), Italian ([`data/gold_set_it.json`](data/gold_set_it.json)), Spanish ([`data/gold_set_es.json`](data/gold_set_es.json)), and German ([`data/gold_set_de.json`](data/gold_set_de.json)):
 
 | Category                           | Gold Items |  Accuracy  | Hallucination Rate | False Replacements | Mean Latency |
 | ---------------------------------- | :--------: | :--------: | :----------------: | :----------------: | :----------: |
-| **Visual Acuity (US, Metric 6m, Decimals)** | 168 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.35 ms |
-| **Refraction (Sphere, Cyl, Axis, Add)**     | 141 | 100.0% | 0.00% | 0 / 52 (0.00%) | 0.40 ms |
-| **Intraocular Pressure (IOP)**     |     85     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.32 ms    |
-| **Fixed Phrases & Slit Lamp**      |    112     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.28 ms    |
-| **Prism & Strabismus**             |     47     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.34 ms    |
-| **Keratometry (K-Readings)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.42 ms    |
-| **Corneal Pachymetry (CCT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.31 ms    |
-| **Tear Breakup Time (TBUT)**       |     31     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.30 ms    |
-| **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |   0.15 ms    |
-| **Alignment (NPC, AC/A, NRA/PRA)** |      4     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Visual Acuity (US, Metric 6m, Decimals)** | 178 | 100.0% | 0.00% | 0 / 52 (0.00%) | — |
+| **Refraction (Sphere, Cyl, Axis, Add)**     | 151 | 100.0% | 0.00% | 0 / 52 (0.00%) | — |
+| **Intraocular Pressure (IOP)**     |     97     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Fixed Phrases & Slit Lamp**      |    236     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Prism & Strabismus**             |     55     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Keratometry (K-Readings)**       |     45     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Corneal Pachymetry (CCT)**       |     39     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Tear Breakup Time (TBUT)**       |     37     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Cup-to-Disc**                    |      3     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Grading**                        |      2     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Contact Lens**                   |      2     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Negative Controls & Non-Clinical** |   52     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
+| **Alignment (NPC, AC/A, NRA/PRA, cover test)** |      6     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
 | **Phrase repairs**                 |      4     |   100.0%   |       0.00%        |   0 / 52 (0.00%)   |      —       |
-| **Overall Multilingual System**    |  **706**   | **100.0%** |     **0.00%**      |     **0.00%**      | **0.81 ms**  |
+| **Overall Multilingual System**    |  **907**   | **100.0%** |     **0.00%**      |     **0.00%**      | **1.63 ms**  |
 
 ### Slot-Level Information Extraction & Verbatim Integrity Metrics
 
-Evaluated across all 1,305 individual clinical slot values extracted across the 706 utterances:
+Evaluated across all 1,484 individual clinical slot values extracted across the 907 utterances:
 
 | Quality Dimension | Metric Value | Quality Gate | Status |
 |---|:---:|:---:|:---:|
-| **Slot-Level Precision** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
-| **Slot-Level Recall** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
-| **Slot-Level F1-Score** | **99.92%** | $\ge 98.0\%$ | ✅ PASS |
-| **Verbatim Narrative Corruption Rate** | **1.2048%** (52 chars altered) | $0.00\%$ | ❌ FAIL |
+| **Slot-Level Precision** | **98.01%** | $\ge 98.0\%$ | ✅ PASS |
+| **Slot-Level Recall** | **99.80%** | $\ge 98.0\%$ | ✅ PASS |
+| **Slot-Level F1-Score** | **98.90%** | $\ge 98.0\%$ | ✅ PASS |
+| **Verbatim Narrative Corruption Rate** | **1.0879%** (52 chars altered) | $0.00\%$ | ❌ FAIL |
 | **Invented Numbers (Hallucination)** | **0.00%** (0 fabricated numbers) | $0.00\%$ | ✅ PASS |
 | **Negative Control False Replacements** | **0.00%** (0 / 52) | $0.00\%$ | ✅ PASS |
 
@@ -567,6 +570,8 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 
 ## Latest Key Improvements & Technical Highlights
 
+- **Closed-class filler noise**: Every exam that already has a copula accepts up to two filler words on each side of it (`actually`, `actuellement`, `ancora`, `todavía`, `noch`, and the rest of that closed list). A bare eye word may follow the exam name (`manifest refraction right is`), and `and` / `et` / `e` / `y` / `und` may join two numbers the exam already reads as a pair (`20 and 20`). Fixed phrases allow one of those filler words between tokens. Open-class words still stay narrative, so a blood-pressure sentence is not promoted to a finding.
+- **Qualitative phrase coverage**: English, French, Italian, Spanish, and German fixed-phrase lexicons now claim stock slit-lamp and fundus wording that previously flushed as narrative (`Macula: flat, dry OU`, `Retina: flat, intact OU`, `Vitreous: clear OU`, `Conjunctiva: quiet OU`, `Iris: normal pattern OU`, `DFE: normal`, `Lids/Lashes: clear OU`), including one mild ASR slip per family.
 - **Acoustic & Phonetic ASR Repair Engine (`acoustic_repair.py`)**:
   - Synthesizes phonetic decimals (e.g. `"minus OH .25 cylinder"` $\rightarrow$ `-0.25 cylinder`), collapses spoken degree symbols (`"at 180°"` $\rightarrow$ `axis 180`), repairs 4-digit concatenated Snellen numbers (`"2020"` $\rightarrow$ `20/20`, `"2400"` $\rightarrow$ `20/400`), and canonicalizes prepended prepositional laterality phrases (`"for the right eye"` $\rightarrow$ `OD`, `"for the left eye"` $\rightarrow$ `OS`).
 - **Refraction Token & Diopter Shorthand Normalizer (`refraction_repair.py`)**:
@@ -599,12 +604,12 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 ```text
 optonorm/
 ├── data/
-│   ├── gold_set.json               # 266 curated clinical & negative control utterances (English)
-│   ├── gold_set_fr.json            # 107 curated clinical & negative control utterances (French)
-│   ├── gold_set_it.json            # 109 curated clinical & negative control utterances (Italian)
-│   ├── gold_set_es.json            # 108 curated clinical & negative control utterances (Spanish)
-│   ├── gold_set_de.json            # 116 curated clinical & negative control utterances (German)
-│   ├── vocabulary_spec.json        # v2.2.0 Optometric clinical shorthand schema & canonical slot specifications (English)
+│   ├── gold_set.json               # 315 curated clinical & negative control utterances (English)
+│   ├── gold_set_fr.json            # 147 curated clinical & negative control utterances (French)
+│   ├── gold_set_it.json            # 147 curated clinical & negative control utterances (Italian)
+│   ├── gold_set_es.json            # 145 curated clinical & negative control utterances (Spanish)
+│   ├── gold_set_de.json            # 153 curated clinical & negative control utterances (German)
+│   ├── vocabulary_spec.json        # v2.3.0 Optometric clinical shorthand schema & canonical slot specifications (English)
 │   ├── vocabulary_spec_fr.json     # French clinical shorthand schema & canonical slot specifications
 │   ├── vocabulary_spec_it.json     # Italian clinical shorthand schema & canonical slot specifications
 │   ├── vocabulary_spec_es.json     # Spanish clinical shorthand schema & canonical slot specifications
@@ -688,6 +693,7 @@ optonorm/
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
 │       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
+│       │   ├── fillers.py          # Closed-class copula fillers, bare laterality, and number-joining conjunctions
 │       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
 │       │   ├── keratometry.py      # Corneal Keratometry (K-readings: flat/steep D @ axis) parser
@@ -751,6 +757,8 @@ optonorm/
 │   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
 │   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
+│   ├── test_filler_gold.py         # Closed-class filler, bare-laterality, and number-joining gold lines
+│   ├── test_phrase_gap_gold.py     # Qualitative phrase-gap gold lines across five locales
 │   ├── test_pipeline.py            # End-to-end normalization pipeline tests
 │   ├── test_preprocessors.py       # Unit tests for self-correction, punctuation repair & stutter collapser
 │   ├── test_pupils.py              # Unit tests for pupillary exam and graded RAPD grammar
@@ -825,7 +833,7 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (804 tests)
+make test           # Run complete test suite with pytest (1022 passed, 1 skipped)
 make test-streaming # Run real-time streaming & ambient scribing test suite (59 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
@@ -908,7 +916,7 @@ uv run pytest -v
 ### 5. Run the Gold Benchmark Evaluation & Slot-Level IE Metrics
 
 ```bash
-# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 706 utterances) with slot-level Precision/Recall/F1.
+# Run benchmark across all supported languages (EN, FR, IT, ES, DE - 907 utterances) with slot-level Precision/Recall/F1.
 # Exits 0 only when utterance accuracy is 100% and the invented-number count is 0.
 # An accuracy drop or any invented number exits 1 (this is the CI gold-benchmark gate).
 uv run python scripts/benchmark_eval.py --locale all
