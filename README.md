@@ -791,12 +791,23 @@ optonorm/
 │   ├── nginx.conf                  # Nginx configuration (SPA fallback + HTTP/WS reverse proxy)
 │   ├── package.json                # Web playground dependencies and scripts
 │   └── vite.config.ts              # Vite configuration with local dev proxy (/v1 -> :8000)
+├── cloudfare/
+│   ├── entrypoint.sh               # Cloudfare dual-process entrypoint (Nginx on 8000 + Uvicorn on 8001)
+│   ├── nginx.conf                  # Cloudfare in-container Nginx reverse proxy configuration
+│   ├── src/
+│   │   ├── env.d.ts                # Ambient type definitions for Cloudflare Workers
+│   │   └── index.ts                # Edge Worker routing (static assets, API, and WebSockets)
+│   ├── tsconfig.json               # TypeScript configuration for Cloudfare Worker
+│   └── wrangler.jsonc              # Cloudfare Wrangler deployment configuration
+├── Dockerfile                      # Multi-stage unprivileged production API container
+├── DockerfileCloudfare             # Unified multi-stage container bundling Vite React SPA and FastAPI with Nginx
+├── docker-compose.yml              # Multi-service Docker Compose stack (optonorm-api on :8000, optonorm-web on :3000)
+├── docker-compose.cloudfare.yml    # Isolated Cloudfare Compose stack (unified app, PostgreSQL 17, pgAdmin 4)
+├── .env.cloudfare.example          # Environment template for isolated Cloudfare stack
 ├── docker/
 │   └── entrypoint.sh               # Creates the auth directory and drops to the optonorm user
-├── Dockerfile                      # Multi-stage unprivileged production API container
-├── docker-compose.yml              # Multi-service Docker Compose stack (optonorm-api on :8000, optonorm-web on :3000)
 ├── .dockerignore                   # Build artifact exclusions
-├── Makefile                        # Unified developer lifecycle & command automation (lint, test, benchmark, serve, web)
+├── Makefile                        # Unified developer lifecycle & command automation (lint, test, benchmark, serve, web, cloudfare)
 ├── main.py                         # Unified root entrypoint: CLI, demo, and FastAPI server runner
 ├── pyproject.toml                  # Packaging, console script ('optonorm'), and dependency configuration
 ├── uv.lock                         # Pinned dependency lockfile
@@ -1310,6 +1321,51 @@ docker compose logs -f
 # Teardown
 docker compose down
 ```
+
+### Isolated Cloudfare Stack (Unified Container + PostgreSQL + pgAdmin)
+
+For Cloudflare Containers, Cloudflare Tunnel, or containerized production deployment, an isolated all-in-one stack is available:
+
+- **Unified Container ([`DockerfileCloudfare`](DockerfileCloudfare))**: Multi-stage image bundling Vite/React 19 SPA (`/usr/share/nginx/html`) and FastAPI with an in-container Nginx reverse proxy on front-facing port `8000`.
+- **Dedicated Compose ([`docker-compose.cloudfare.yml`](docker-compose.cloudfare.yml))**: Orchestrates `optonorm-app` on port `8000`, `optonorm-db` (PostgreSQL 17) on port `5432`, and `optonorm-pgadmin` (pgAdmin 4) on port `5050`.
+- **Database Awareness**: Configured with `OPTONORM_AUTH_DATABASE_URL=postgresql://${OPTONORM_POSTGRES_USER:-optonorm}:${OPTONORM_POSTGRES_PASSWORD:-optonorm_secret}@optonorm-db:5432/${OPTONORM_POSTGRES_DB:-optonorm}`. Automatically provisions auth and audit tables on boot.
+
+```bash
+# Build unified Cloudfare image
+make cloudfare-build
+
+# Start isolated stack in background (app, PostgreSQL, pgAdmin)
+make cloudfare-up
+
+# Verify unified frontend & API
+curl http://localhost:8000/           # React 19 SPA
+curl http://localhost:8000/v1/health  # FastAPI health
+
+# Access pgAdmin 4 panel
+open http://localhost:5050/           # Login: admin@example.com / admin1234
+
+# Stream logs & teardown
+make cloudfare-logs
+make cloudfare-down
+```
+
+#### Production Deploy to Cloudflare (Wrangler + Workers Containers)
+
+1. Authenticate with Cloudflare:
+   ```bash
+   npx wrangler login
+   ```
+2. Configure production secrets in Cloudflare:
+   ```bash
+   cd cloudfare
+   npx wrangler secret put OPTONORM_JWT_SECRET
+   npx wrangler secret put OPTONORM_AUTH_DATABASE_URL
+   npx wrangler secret put OPTONORM_BOOTSTRAP_ADMIN_PASSWORD
+   ```
+3. Deploy frontend assets & backend container to `https://optonorm.com`:
+   ```bash
+   make deploy
+   ```
 
 ---
 
