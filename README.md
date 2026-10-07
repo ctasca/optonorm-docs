@@ -8,7 +8,7 @@
 [![Version: 0.32.0](https://img.shields.io/badge/version-0.32.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1022%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1480%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -25,7 +25,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
 ## Key Capabilities & Design Guarantees
 
 1. **Deterministic Typed Grammars**:
-   - **Visual Acuity**: Distance Snellen (Imperial `20/20`–`20/400`, Metric `6/6`, `6/9`, `6/12`, `6/7.5`, `6/60`), pinhole (`PH 20/25`, `PH 6/7.5`), qualitative acuities (`CF @ 3ft`, `HM`, `LP`, `NLP`), monocular (`OD`, `OS`) and binocular (`OU`) laterality.
+   - **Visual Acuity**: Distance Snellen (Imperial `20/20`–`20/400`, Metric `6/6`, `6/9`, `6/12`, `6/7.5`, `6/60`), pinhole (`PH 20/25`, `PH 6/7.5`), qualitative acuities (`CF @ 3ft`, `HM`, `LP`, `NLP`), monocular (`OD`, `OS`) and binocular (`OU`) laterality. Spoken _"20 to 25"_, _"20 slash 25"_, _"20 forward slash 25"_, and _"6 to 12"_ are fractions. _"Cup to disc"_ is not.
    - **Visual Acuity Tails & Outcome Clauses**: Recognizes visual acuity outcome tails following manifest refraction refinement (e.g. _"giving 2020"_ $\rightarrow$ `giving VA 20/20`, _"Also 2020"_ $\rightarrow$ `VA 20/20`), and binocular balance endpoints (_"Nuclear balance accepted with both eyes open. 2020"_ $\rightarrow$ `Binocular balance: 20/20 OU`).
    - **Explicit Distance & Near Differentiation**:
      - Explicit _"distance visual acuity"_ / _"distance acuity"_ $\rightarrow$ **`DVA`** (e.g., `DVA OD 20/400 sc`, `DVA OD 6/12 PH 6/7.5 sc`). Contextually propagates across contralateral eyes in the same distance test sequence.
@@ -35,7 +35,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Subjective & Objective Refraction**:
      - Standard dictation: Sphere, cylinder, axis, and reading add powers (`OD -2.50 -0.75 x 180 Add +2.00`).
      - Isolated cylinder clauses with dysfluency resilience (`"-0.75 cylinder Cylinder at 85° for the left eye"` $\rightarrow$ `OS -0.75 x 085`, `"-1.75 sphere -0.50 cylinder cylinder at 20°"` $\rightarrow$ `OD -1.75 -0.50 x 020`) and standalone reading add prescriptions (`Add +1.75 OU`, `"Frenier, the AD is plus 2.00 diopters in both eyes"` $\rightarrow$ `Add +2.00 OU`).
-     - **3-to-5 Number Rapid Sequence Dictation**: Clinicians dictating rapid numeric sequences without parameter words, with or without spoken connectors like _"and"_ / _"at"_ / _"x"_ (e.g., _"Manifest Refraction is 1 1 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Manifest Refraction is 1 1 and 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Refraction is 1 1 and 1"_ $\rightarrow$ `+1.00 -1.00 x 001`, _"Left eye is -1 2 40"_ $\rightarrow$ `OS -1.00 -2.00 x 040`, _"Right eye is -2.50 -0.75 180 2.00 64"_ $\rightarrow$ `OD -2.50 -0.75 x 180 Add +2.00 PD 64`). Unsigned cylinder still follows the minus-cylinder convention. An unsigned sphere is proposed as plus and flagged for review, because that sign was not spoken.
+     - **3-to-5 Number Rapid Sequence Dictation**: Clinicians dictating rapid numeric sequences without parameter words, with or without spoken connectors like _"and"_ / _"at"_ / _"x"_ (e.g., _"Manifest Refraction is 1 1 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Manifest Refraction is 1 1 and 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Refraction is 1 1 and 1"_ $\rightarrow$ `+1.00 -1.00 x 001`, _"Left eye is -1 2 40"_ $\rightarrow$ `OS -1.00 -2.00 x 040`, _"Right eye is -2.50 -0.75 180 2.00 64"_ $\rightarrow$ `OD -2.50 -0.75 x 180 Add +2.00 PD 64`). Unsigned cylinder still follows the minus-cylinder convention. An unsigned sphere is proposed as plus and flagged for review, because that sign was not spoken. A hundredths cylinder is the exception: _"1 to 15 and 40"_, _"1 too 15 and 40"_, and _"1 two 15 and 40"_ are the same as _"1 2 15 and 40"_ and are written as `+1.00 -2.15 x 040`. _"1 1 and 40"_ stays a reviewed plus proposal.
    - **Contact Lens Examination, Brands & Over-Refraction**:
      - Standardizes contact lens specifications (Brand, Modality, Base Curve, Diameter, Sphere, Cylinder, Axis, Add Power) e.g., `Biofinity OD: Toric / BC 8.7 / Dia 14.5 / -2.00 -1.25 x 180`.
      - Contact lens over-refraction (`CL OR OD: plano -0.50 x 010 -> 20/20`, `CL OR OS: +0.25 -> 20/20`).
@@ -570,6 +570,7 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 
 ## Latest Key Improvements & Technical Highlights
 
+- **Dictated exam frames**: _"I focus now on the manifest refraction OD is 1 to 15 and 40"_ keeps the exam name and becomes `OD +1.00 -2.15 x 040`. The same frame writes visual acuity (`20 to 25` or `20 slash 25` → `VA OD 20/25`), intraocular pressure (`IOP: OD 14 mmHg`), and corneal pachymetry (`CCT: 540 OD µm`). In a cylinder, _to_ / _too_ / _two_ mean two. In a Snellen fraction, _to_, _slash_, and _forward slash_ mean a slash.
 - **Closed-class filler noise**: Every exam that already has a copula accepts up to two filler words on each side of it (`actually`, `actuellement`, `ancora`, `todavía`, `noch`, and the rest of that closed list). A bare eye word may follow the exam name (`manifest refraction right is`), and `and` / `et` / `e` / `y` / `und` may join two numbers the exam already reads as a pair (`20 and 20`). Fixed phrases allow one of those filler words between tokens. Open-class words still stay narrative, so a blood-pressure sentence is not promoted to a finding.
 - **Qualitative phrase coverage**: English, French, Italian, Spanish, and German fixed-phrase lexicons now claim stock slit-lamp and fundus wording that previously flushed as narrative (`Macula: flat, dry OU`, `Retina: flat, intact OU`, `Vitreous: clear OU`, `Conjunctiva: quiet OU`, `Iris: normal pattern OU`, `DFE: normal`, `Lids/Lashes: clear OU`), including one mild ASR slip per family.
 - **Acoustic & Phonetic ASR Repair Engine (`acoustic_repair.py`)**:
@@ -743,6 +744,7 @@ optonorm/
 │   ├── test_contact_lens_catalog.py# Master contact lens catalog, acoustic repair, and zero-false-positive tests
 │   ├── test_dotphrase.py           # Dotphrase expander & auto-complete tests
 │   ├── test_exam_catalog.py        # Unit tests for Master Clinical Exam Catalog, categories & metadata
+│   ├── test_exam_phrase_corpus.py  # Generated dictated exam frames for refraction, acuity, pressure, and pachymetry
 │   ├── test_fhir.py                # FHIR R4 Bundle and Observation tests
 │   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
 │   ├── test_grading.py             # Unit tests for biomicroscopy and slit lamp severity grading
@@ -844,7 +846,7 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (1022 passed, 1 skipped)
+make test           # Run complete test suite with pytest (1480 passed, 1 skipped)
 make test-streaming # Run real-time streaming & ambient scribing test suite (59 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
