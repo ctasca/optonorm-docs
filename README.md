@@ -1078,7 +1078,7 @@ Lists supported language codes (`en`, `fr`, `it`, `es`, `de`), clinical scales, 
 
 #### 4. `GET /v1/health`
 
-Liveness probe reporting process status, version, and loaded locale codes. It does not parse a transcript, so a `200` does not prove the grammars loaded or that a sample note would normalize.
+Liveness probe reporting process status, version, loaded locale codes, and `database`. `database` is `ok` when the auth store opened or authentication is off. When the auth database refuses the connection, the process still stays up and `database` carries a short error that omits the connection string. A `200` does not prove the grammars loaded or that a sample note would normalize.
 
 #### 5. `WebSocket /v1/normalize/stream`
 
@@ -1166,7 +1166,7 @@ Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1
 - **Transcript cap.** When `OPTONORM_MAX_TRANSCRIPT_LENGTH` is a positive integer, `POST /v1/normalize`, `POST /v1/fhir`, the SSE `text` query, and each WebSocket message are rejected once the character count (including text already held in the streaming buffer) exceeds it. The status is **413**. A non-numeric value fails process startup. The check runs after the body has been read, so a reverse proxy should still set its own body-size limit.
 - **SSE query string.** The transcript and `patient_id` travel in the URL. Do not put real identifiers there.
 - **Event loop.** `POST /v1/normalize` and `POST /v1/fhir` are synchronous routes, so FastAPI runs them in a worker thread. The WebSocket and SSE handlers call `normalize()` on the asyncio event loop. A long streaming transcript stalls other connections on that worker.
-- **Health.** `GET /v1/health` only reports that the process is up.
+- **Health.** `GET /v1/health` reports that the process is up. The `database` field is `ok`, or a short auth-database error when the store failed to open. The connection string is not included. A refused database does not stop the process.
 
 ```bash
 OPTONORM_JWT_SECRET="$(openssl rand -hex 32)" \
