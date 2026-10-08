@@ -8,7 +8,7 @@
 [![Version: 0.32.0](https://img.shields.io/badge/version-0.32.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1480%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1499%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -188,18 +188,19 @@ flowchart TD
         W2[Ambient Scribe Simulator<br/>WebSocket Stream & Holdback HUD]
         W3[Clinical Diff & Findings<br/>LOINC / SNOMED CT Table]
         W4[FHIR R4 Inspector & Note<br/>US Core 6.1.0 Consultation Note]
+        W5[Optical Tools Suite<br/>Cyl Transposition · Vertex · Spherical Equivalent]
     end
 
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
         API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
         AUTH[Authentication and audit<br/>JWT sessions, API keys, role scopes]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
-        PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Pinned Acoustic Repair, English only · Locale Exam, Anatomy & Medication Matchers<br/>English Homophones · Past Copulas fr, de, it, es · Refraction & Diopter Repair]
+        PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Pinned Acoustic Repair 2.0 · Locale Exam, Anatomy & Medication Matchers<br/>English & French Homophones · Refraction Stages & Diopter Repair]
         C[Candidate Span Extractors]
         
         subgraph Grammars & Lexicon
             C --> D1[Visual Acuity Grammar<br/>Snellen, Metric 6m, Pinhole, Decimals]
-            C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add, Rapid Sequences]
+            C --> D2[Refraction Grammar<br/>Sphere, Cyl, Axis, Add, RefractionStage]
             C --> D3[Tonometry / IOP Grammar<br/>GAT, NCT, iCare, Spoken Units]
             C --> D4[Prism Grammar<br/>Δ BI, BO, BU, BD]
             C --> D5[Keratometry Grammar<br/>K Flat, Steep, Cyl, Axis]
@@ -211,9 +212,11 @@ flowchart TD
             C --> D11[Fixed Clinical Phrase Lexicon]
             C --> D12[Contact Lens Grammar<br/>Specs, Brand, Modality, Over-Refraction]
             C --> D13[Master Catalogs & Intelligent Matchers<br/>Exams, Anatomy, Medications & Contact Lenses]
+            C --> D14[Retina & Posterior Segment Grammar<br/>Optic Disc Sharpness, Drusen/AMD, Retinopathy]
+            C --> D15[Dry Eye / DEWS II Grammar<br/>Schirmer Test, MGD Expressibility Grade, TMH]
         end
 
-        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 & D12 & D13 --> E[Post-Hoc Verification Pipeline]
+        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 & D12 & D13 & D14 & D15 --> E[Post-Hoc Verification Pipeline]
 
         subgraph Safety Guards
             E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
@@ -230,7 +233,7 @@ flowchart TD
     PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
 
     I --> J[Normalized EHR Clinical Text]
-    I --> K[Structured FHIR R4 Bundle Exporter<br/>LOINC, SNOMED CT, UCUM, DiagnosticReport]
+    I --> K[Structured FHIR R4 Bundle Exporter<br/>VisionPrescription · Observations · ICD-10-CM · SNOMED CT]
     H --> L[Clinician Correction Harvesting JSONL]
 ```
 
@@ -694,13 +697,15 @@ optonorm/
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
 │       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
+│       │   ├── dry_eye.py          # Ocular surface & DEWS II dry eye (Schirmer test, MGD expressibility grade, TMH) parser
 │       │   ├── fillers.py          # Closed-class copula fillers, bare laterality, and number-joining conjunctions
 │       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
 │       │   ├── keratometry.py      # Corneal Keratometry (K-readings: flat/steep D @ axis) parser
 │       │   ├── prism.py            # Horizontal (BI/BO) and vertical (BU/BD) prism diopter parser
 │       │   ├── pupils.py           # Pupillary exam, dynamic diameters, anisocoria & graded RAPD parser
-│       │   ├── refraction.py       # Refraction, cylinder stutter, and add power parser
+│       │   ├── refraction.py       # Refraction, cylinder stutter, stage classification, and add power parser
+│       │   ├── retina.py           # Posterior segment & retina: optic disc sharpness, macular drusen/AMD, diabetic retinopathy
 │       │   ├── templates.py        # Abstract Parametric Regex Templates (universal clinical syntax topology)
 │       │   └── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
 │       ├── guards/
@@ -769,9 +774,12 @@ optonorm/
 │   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
+│   ├── test_refraction_stage_and_acoustic_repair.py # Refraction stage disambiguation & Acoustic Repair 2.0
 │   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
+│   ├── test_retina_and_dry_eye.py  # Retina and DEWS II dry eye grammar tests with FHIR mapping
 │   ├── test_streaming.py           # Chunked simulation plus word-chunk parity for every visit transcript
-│   └── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
+│   ├── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
+│   └── test_vision_prescription_and_icd10.py # HL7 FHIR R4 VisionPrescription & automated ICD-10 diagnostic coding tests
 ├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
 │   ├── src/
 │   │   ├── components/
@@ -779,12 +787,14 @@ optonorm/
 │   │   │   ├── common/             # Reusable BrandLogo (SVG) and shared UI primitives
 │   │   │   ├── fhir/               # FhirInspector (JSON tree) & ClinicalDocumentView (US Core XHTML)
 │   │   │   ├── form/               # ClinicalInputForm (@tanstack/react-form) & PresetSelector
+│   │   │   ├── home/               # Comprehensive marketing homepage & interactive capability showcase
 │   │   │   ├── inspector/          # ClinicalDiffViewer (inline/side-by-side diff) & FindingsTable
 │   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
+│   │   │   ├── OpticalTools/       # Optical calculators: Cylinder transposition, vertex distance & spherical equivalent
 │   │   │   └── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
 │   │   ├── data/                   # Multilingual clinical presets across 5 languages
 │   │   ├── lib/                    # Authenticated fetch client, TanStack QueryClient, terminology mappings
-│   │   ├── store/                  # Redux Toolkit store (authSlice, streamingSlice, normalizationSlice, uiSlice)
+│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, uiSlice)
 │   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
 │   │   ├── App.tsx                 # Root application cockpit layout
 │   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
