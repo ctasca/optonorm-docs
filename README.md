@@ -5,7 +5,7 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.43.1](https://img.shields.io/badge/version-0.43.1-blue.svg)]()
+[![Version: 0.43.2](https://img.shields.io/badge/version-0.43.2-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
 [![Tests](https://img.shields.io/badge/tests-1648%20passed-brightgreen.svg)]()
