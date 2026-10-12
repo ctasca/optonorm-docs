@@ -5,14 +5,14 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.38.1](https://img.shields.io/badge/version-0.38.1-blue.svg)]()
+[![Version: 0.39.0](https://img.shields.io/badge/version-0.39.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1580%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1601%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-1.63%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-2.05%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -176,7 +176,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
 
 8. **Production FastAPI REST API & Plug-and-Play APIRouter**:
    - **Dual-Mode Consumption**: Runs as an independent containerized microservice or embeds directly into external FastAPI applications via `app.include_router(get_optonorm_router(...))`.
-   - **Standard REST Endpoints**: `/v1/normalize` (with granular audit edits and latency telemetry), `/v1/fhir` (HL7 FHIR R4 Bundle generation), `/v1/locales` (supported scales and conventions), and `/v1/health`.
+   - **Standard REST Endpoints**: `/v1/normalize` (with granular audit edits and latency telemetry), `/v1/fhir` (HL7 FHIR R4 Bundle generation), `/v1/locales` (supported scales and conventions), `/v1/contact/token` (anti-bot HMAC-SHA256 time tickets), `/v1/contact` (public inquiry channel with honeypot & PHI guards), and `/v1/health`.
    - **Content Negotiation & Telemetry**: Automatically infers target language from `Accept-Language` headers when not explicitly provided and reports sub-millisecond execution latency in `X-Process-Time-Ms` response headers.
    - **Interactive Documentation**: Auto-generated Swagger UI (`/docs`) and ReDoc (`/redoc`) with pre-configured clinical examples across all supported languages.
 
@@ -220,11 +220,13 @@ flowchart TD
         W3[Clinical Diff & Findings<br/>LOINC / SNOMED CT Table]
         W4[FHIR R4 Inspector & Note<br/>US Core 6.1.0 Consultation Note]
         W5[Optical Tools Suite<br/>Cyl Transposition · Vertex · Spherical Equivalent]
+        W6[Community & Contributing Portal<br/>Persona Inquiries · Secure Zero-PHI Contact Hub]
     end
 
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
-        API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream]
+        API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream · /v1/contact]
         AUTH[Authentication and audit<br/>JWT sessions, API keys, role scopes]
+        CONTACT[Secure Contact Hub & Anti-Bot<br/>HMAC Time Gate · Nonce Replay Guard · Sliding Rate Limit · 90d Prune]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
         PRE[Acoustic & Speech Dysfluency Preprocessor Pipeline<br/>Self-Correction · Punctuation Re-Stitcher · Stutter Collapser<br/>Pinned Acoustic Repair 2.0 · Locale Exam, Anatomy & Medication Matchers<br/>English & French Homophones · Refraction Stages & Diopter Repair]
         C[Candidate Span Extractors]
@@ -268,6 +270,7 @@ flowchart TD
 
     Client <-->|REST, WebSocket, Bearer JWT or X-API-Key<br/>Host :3000 -> Container :8080 / :8000| API
     API --> AUTH --> B --> PRE --> C
+    API --> CONTACT
     PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
 
     I --> J[Normalized EHR Clinical Text]
@@ -712,13 +715,18 @@ optonorm/
 │       │   ├── audit.py            # Append-only audit rows (transcript SHA-256 only)
 │       │   ├── bootstrap.py        # Optional first administrator from the environment
 │       │   ├── commands.py         # `optonorm auth` administration commands
-│       │   └── storage/            # SQLite default store and optional Postgres store
+│       ├── contact/                # Standalone public contact form storage, security guards, and rate limiting
+│       │   ├── __init__.py         # Contact package exports
+│       │   ├── models.py           # Immutable ContactRecord dataclass
+│       │   ├── storage.py          # Standalone SQLite and PostgreSQL storage adapters (90-day retention prune)
+│       │   └── security.py         # Anti-bot HMAC-SHA256 tokens, nonce replay cache, honeypot, sliding-window rate limiter, and PHI regex guards
 │       ├── api/                    # Production FastAPI serving & plug-and-play router
 │       │   ├── __init__.py         # Public exports (create_app, optonorm_router, get_optonorm_router)
 │       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware, OpenAPI auth
 │       │   ├── dependencies.py     # Caller resolution and permission checks
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   ├── routes_auth.py      # /v1/auth login, refresh, users, API keys, and audit
+│       │   ├── routes_contact.py   # /v1/contact/token (HMAC time gate) and /v1/contact (inquiry submission & honeypot drop)
 │       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
 │       │   └── settings.py         # CORS, transcript cap, and authentication settings
 │       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
@@ -796,9 +804,11 @@ optonorm/
 │   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
 │   ├── test_clinical_alerts.py     # Clinical Decision Support (CDS) rule evaluation & critical triage tests
 │   ├── test_collisions.py          # Multilingual token collision & disambiguation test suite
+│   ├── test_contact_api.py         # FastAPI contact endpoints (/v1/contact/token, /v1/contact), rate limits, honeypot drop, and PHI guard
 │   ├── test_contact_lens.py        # Contact lens parameters, over-refraction, and vertex distance tests
 │   ├── test_contact_lens_phase6.py # Fit dynamics, SOR/SCOR, topography indices, and FHIR codes
 │   ├── test_contact_lens_catalog.py# Master contact lens catalog, acoustic repair, and zero-false-positive tests
+│   ├── test_contact_security.py    # Cryptographic token HMAC-SHA256, nonce replay cache, IP rate limiter, and PHI regex filters
 │   ├── test_dotphrase.py           # Dotphrase expander & auto-complete tests
 │   ├── test_exam_catalog.py        # Unit tests for Master Clinical Exam Catalog, categories & metadata
 │   ├── test_exam_phrase_corpus.py  # Generated dictated exam frames for refraction, acuity, pressure, and pachymetry
@@ -843,14 +853,14 @@ optonorm/
 │   │   │   ├── common/             # Reusable BrandLogo (SVG) and shared UI primitives
 │   │   │   ├── fhir/               # FhirInspector (JSON tree) & ClinicalDocumentView (US Core XHTML)
 │   │   │   ├── form/               # ClinicalInputForm (@tanstack/react-form) & PresetSelector
-│   │   │   ├── home/               # Comprehensive marketing homepage & interactive capability showcase
+│   │   │   ├── home/               # Comprehensive marketing homepage, ContributingSection (personas) & ContactSection (hub)
 │   │   │   ├── inspector/          # ClinicalDiffViewer (inline/side-by-side diff) & FindingsTable
 │   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
 │   │   │   ├── OpticalTools/       # Optical calculators: Cylinder transposition, vertex distance & spherical equivalent
 │   │   │   └── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
 │   │   ├── data/                   # Multilingual clinical presets across 5 languages
 │   │   ├── lib/                    # Authenticated fetch client, TanStack QueryClient, terminology mappings
-│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, uiSlice)
+│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, contactSlice, uiSlice)
 │   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
 │   │   ├── App.tsx                 # Root application cockpit layout
 │   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
@@ -1212,15 +1222,65 @@ Server-Sent Events (SSE) endpoint providing unidirectional HTTP streaming of nor
 curl -N "http://localhost:8000/v1/normalize/sse?text=visual%20acuity%202020%20right%20eye.%20IOP%2014%20mmHg%20left%20eye."
 ```
 
+#### 7. `GET /v1/contact/token` and `POST /v1/contact`
+
+Public contact channel for community inquiries, ASR mishearing bug reports, new language locale proposals, and parser contributions. Fully decoupled from clinical auth credentials, allowing public contributor outreach while enforcing strict healthcare security controls.
+
+- **Anti-Bot Cryptographic Time Ticket (`GET /v1/contact/token`)**: Issues a cryptographically signed HMAC-SHA256 token binding a UNIX timestamp and single-use random nonce. Submissions issued in $< 3.0$ seconds (automated bot scripts) or $> 7,200$ seconds (stale replays) are rejected with HTTP 400. Replayed nonces are rejected by an in-memory thread-safe `NonceCache`.
+- **Honeypot Decoy (`contact_code`)**: Bot scrapers populating the hidden decoy input are silently accepted (returns HTTP 200 with a dummy submission reference) without writing to the database or triggering alerts.
+- **Strict Zero-PHI Enforcement**: Server-side high-precision regex detectors inspect all fields for patient phone numbers, emails, and labeled healthcare identifiers (`MRN`, `NHS`, `SSN`, Italian Codice Fiscale). Genuine optometric notation (axes, diopters, keratometry) is preserved without false positives. Detected PHI triggers immediate rejection with HTTP 422.
+- **Sliding-Window Rate Limiting**: In-memory sliding-window limiter allows a burst of up to 3 submissions per 60 seconds and 10 per hour per client IP. Client IPs are irreversibly hashed with salted SHA-256 (`OPTONORM_CONTACT_IP_SALT`) to protect user privacy.
+- **Data Retention & Storage**: Standalone SQLite database (`data/contact.db` or PostgreSQL via `OPTONORM_CONTACT_DATABASE_URL`). When `OPTONORM_CONTACT_DATABASE_URL` is unset, it automatically inherits `OPTONORM_AUTH_DATABASE_URL` or `DATABASE_URL` if configured for Postgres. Submissions older than 90 days are automatically pruned on server startup.
+
+```bash
+# Initialize contact inquiry tables and indexes in SQLite or PostgreSQL:
+uv run main.py contact init-db
+
+# Or initialize both authentication and contact tables together:
+uv run main.py auth init-db
+```
+
+```bash
+# 1. Fetch anti-bot ticket
+TICKET=$(curl -s http://localhost:8000/v1/contact/token)
+TOKEN=$(echo "$TICKET" | jq -r .token)
+NONCE=$(echo "$TICKET" | jq -r .nonce)
+TS=$(echo "$TICKET" | jq -r .timestamp)
+
+# 2. Wait 3 seconds to clear the anti-bot time gate, then submit
+sleep 3
+curl -X POST http://localhost:8000/v1/contact \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Dr. Jane Smith, OD",
+    "email": "jane.smith@eyecare.org",
+    "category": "clinical_vocabulary",
+    "subject": "[Clinical Vocabulary]: Pediatric Fix & Follow",
+    "message": "Proposal to recognize F&F and CSM across bilingual pediatric exams.",
+    "phi_confirmed": true,
+    "contact_code": "",
+    "anti_bot_token": "'"$TOKEN"'",
+    "anti_bot_nonce": "'"$NONCE"'",
+    "token_timestamp": '"$TS"'
+  }'
+```
+
 ### Deployment limits
 
-Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` require a Bearer access token or an `X-API-Key` header. `GET /v1/health` and `GET /v1/locales` stay public. Set `OPTONORM_AUTH_ENABLED=false` to restore the open gateway for a private lab or an existing unauthenticated pipeline.
+Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` require a Bearer access token or an `X-API-Key` header. `GET /v1/health`, `GET /v1/locales`, `GET /v1/contact/token`, and `POST /v1/contact` stay public. Set `OPTONORM_AUTH_ENABLED=false` to restore the open gateway for a private lab or an existing unauthenticated pipeline.
 
 | Control | Default | Tighten with |
 | --- | --- | --- |
 | Authentication | Required (`OPTONORM_AUTH_ENABLED=true`) | `OPTONORM_AUTH_ENABLED=false` restores the open gateway |
 | JWT secret | Required when authentication is on, at least 32 bytes | `OPTONORM_JWT_SECRET` |
-| Auth database | SQLite file `data/auth.db` | `OPTONORM_AUTH_DB_PATH` or `OPTONORM_AUTH_DATABASE_URL` (`postgresql://`) |
+| Auth database | SQLite file `data/auth.db` | `OPTONORM_AUTH_DB_PATH` or `OPTONORM_AUTH_DATABASE_URL` (`postgresql://`, inherits `DATABASE_URL`) |
+| Contact database | SQLite file `data/contact.db` | `OPTONORM_CONTACT_DB_PATH` or `OPTONORM_CONTACT_DATABASE_URL` (inherits `OPTONORM_AUTH_DATABASE_URL` / `DATABASE_URL`) |
+| Contact IP salt | Derived from JWT secret or random | `OPTONORM_CONTACT_IP_SALT` |
+| Contact notifications | Disabled (database only) | `OPTONORM_CONTACT_NOTIFICATION_EMAIL` (target recipient address) |
+| Contact sender address | `no-reply@optonorm.com` | `OPTONORM_CONTACT_EMAIL_FROM` |
+| Contact email delivery (API) | Disabled | `OPTONORM_RESEND_API_KEY` (transactional HTTPS REST via Resend) |
+| Contact email delivery (SMTP)| Disabled | `OPTONORM_SMTP_HOST`, `OPTONORM_SMTP_PORT`, `OPTONORM_SMTP_USERNAME`, `OPTONORM_SMTP_PASSWORD`, `OPTONORM_SMTP_USE_TLS` |
+| Contact webhook | Disabled (database only) | `OPTONORM_CONTACT_WEBHOOK_URL` (JSON POST dispatch) |
 | Browser origins | Any `Origin` is reflected, and `Access-Control-Allow-Credentials` is `true` | `OPTONORM_CORS_ORIGINS` |
 | Transcript length | No character cap | `OPTONORM_MAX_TRANSCRIPT_LENGTH` |
 
