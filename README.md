@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.34.8](https://img.shields.io/badge/version-0.34.8-blue.svg)]()
+[![Version: 0.38.1](https://img.shields.io/badge/version-0.38.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1502%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1580%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -25,30 +25,61 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
 ## Key Capabilities & Design Guarantees
 
 1. **Deterministic Typed Grammars**:
-   - **Visual Acuity**: Distance Snellen (Imperial `20/20`–`20/400`, Metric `6/6`, `6/9`, `6/12`, `6/7.5`, `6/60`), pinhole (`PH 20/25`, `PH 6/7.5`), qualitative acuities (`CF @ 3ft`, `HM`, `LP`, `NLP`), monocular (`OD`, `OS`) and binocular (`OU`) laterality. Spoken _"20 to 25"_, _"20 slash 25"_, _"20 forward slash 25"_, and _"6 to 12"_ are fractions. _"Cup to disc"_ is not.
+   - **Visual Acuity**:
+     - **Snellen & Metric**: Distance Snellen (Imperial `20/10`–`20/800` including intermediate lines `20/125`, `20/12`, Metric `6/3`–`6/120` including `6/3.8`, `6/4`, `6/5`, `6/7.5`, `6/12`, `6/60`), pinhole (`PH 20/25`, `PH 6/7.5`), monocular (`OD`, `OS`) and binocular (`OU`) laterality. Spoken _"20 to 25"_, _"20 slash 25"_, _"20 forward slash 25"_, and _"6 to 12"_ are fractions. _"Cup to disc"_ is not.
+     - **LogMAR & ETDRS Letters**: Decimal logMAR bounded strictly at $\le 1.30$ (`logMAR 0.1`, `logMAR -0.2`, `logMAR 0.0`) mapped to LOINC `LL3783-9` and ETDRS letter scores (`ETDRS 85 letters`, `85 letters read`) mapped to LOINC `55282-8`.
+     - **Low-Vision & Pediatric Behaviors**: Qualitative low-vision projection (`LPP`, `LP c proj`, `LP s proj`, `CF @ 3ft`, `HM`, `LP`, `NLP`) and pediatric behavioral assessments (`F&F` Fix and Follow, `CSM` Central Steady Maintained across 5 languages, `BTL` Blinks to Light across 5 languages).
+     - **Near Acuity & Typography Scales**: French Parinaud (`P1.5`–`P14`), Italian/Spanish Jaeger (`J1`–`J7`), Austrian/German Nieden (`N1`–`N8`), Birkhäuser (`B1`–`B6`), and British typographical N-point print (`N5`–`N48`). Disambiguates shared tokens (`N5`, `N6`, `N8`) between Nieden and British N-point using typographical cues (`point`, `print`, `British`).
    - **Visual Acuity Tails & Outcome Clauses**: Recognizes visual acuity outcome tails following manifest refraction refinement (e.g. _"giving 2020"_ $\rightarrow$ `giving VA 20/20`, _"Also 2020"_ $\rightarrow$ `VA 20/20`), and binocular balance endpoints (_"Nuclear balance accepted with both eyes open. 2020"_ $\rightarrow$ `Binocular balance: 20/20 OU`).
    - **Explicit Distance & Near Differentiation**:
-     - Explicit _"distance visual acuity"_ / _"distance acuity"_ $\rightarrow$ **`DVA`** (e.g., `DVA OD 20/400 sc`, `DVA OD 6/12 PH 6/7.5 sc`). Contextually propagates across contralateral eyes in the same distance test sequence.
-     - Explicit _"near visual acuity"_ / _"near vision"_ $\rightarrow$ **`NVA`** (e.g., `NVA OU 20/20`).
+     - Explicit _"distance visual acuity"_ / _"distance acuity"_ $\rightarrow$ **`DVA`** (e.g., `DVA OD 20/400 sc`, `DVA OD 6/12 PH 6/7.5 sc`, `DVA OD logMAR 0.1`). Contextually propagates across contralateral eyes in the same distance test sequence.
+     - Explicit _"near visual acuity"_ / _"near vision"_ $\rightarrow$ **`NVA`** (e.g., `NVA OU 20/20`, `NVA OD N5`).
      - General _"visual acuity"_ $\rightarrow$ canonical **`VA`** (e.g., `VA OD 20/20`).
    - **Correction State Extraction**: Standardizes unaided (_sine correctione_ $\rightarrow$ **`sc`**) and aided (_cum correctione_ $\rightarrow$ **`cc`**) conditions (e.g., `DVA OD 20/400 sc`).
    - **Subjective & Objective Refraction**:
      - Standard dictation: Sphere, cylinder, axis, and reading add powers (`OD -2.50 -0.75 x 180 Add +2.00`).
+     - **Advanced Refractive Diagnostics, Cycloplegia, Retinoscopy & Lensometry (Phase 1B)**:
+       - **Manifest Diagnostics**: Spherical equivalent (`SE -3.25 D`, LOINC `70948-5`), back vertex distance (`BVD 12 mm` / `HSA 14 mm`, LOINC `95289-5`), intermediate add (`Int Add +1.25 D`, LOINC `95382-8`), and monocular pupillary distance (`Mono PD 31.5/32.5`). Multilingual spoken support across EN, FR, DE, IT, ES.
+       - **Autorefraction**: Reliability / confidence scores (`Conf 8`, `*`), pupil diameter (`PS 4.5 mm`), companion autokeratometry (`ARK`), and `RefractionStage.AUTOREFRACTOR_DRY` / `AUTOREFRACTOR_WET`.
+       - **Cycloplegic Refraction**: Agent specification (`Cyclo 1%`, `Tropicamide`, `Atropine`), post-drops elapsed time (`30 min post-drops`), residual accommodation (`res acc 0.50 D`), tonus deduction (`Tonus -0.75 D`), and `RefractionStage.CYCLOPLEGIC`.
+       - **Retinoscopy**: Gross vs. Net distinction (`Gross Ret:`, `Net Ret:`), working distance deduction (`WD -1.50 D`), reflex motion (`with`, `against`, `neutrality`), dynamic retinoscopic lag (`MEM +0.50 D`), and `RefractionStage.RETINOSCOPY`.
+       - **Lensometry & Habitual Correction**: Multifocal lens designs (`SV`, `FT-28`, `FT-35`, `PAL`, `Prog`), segment height (`Seg ht 18 mm`, SNOMED CT `419309008`), optical center height (`OC ht 22 mm`), slab-off bicentric grinding prism (`slab-off 2Δ BD`), and `RefractionStage.HABITUAL`.
      - Isolated cylinder clauses with dysfluency resilience (`"-0.75 cylinder Cylinder at 85° for the left eye"` $\rightarrow$ `OS -0.75 x 085`, `"-1.75 sphere -0.50 cylinder cylinder at 20°"` $\rightarrow$ `OD -1.75 -0.50 x 020`) and standalone reading add prescriptions (`Add +1.75 OU`, `"Frenier, the AD is plus 2.00 diopters in both eyes"` $\rightarrow$ `Add +2.00 OU`).
      - **3-to-5 Number Rapid Sequence Dictation**: Clinicians dictating rapid numeric sequences without parameter words, with or without spoken connectors like _"and"_ / _"at"_ / _"x"_ (e.g., _"Manifest Refraction is 1 1 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Manifest Refraction is 1 1 and 40"_ $\rightarrow$ `+1.00 -1.00 x 040`, _"Refraction is 1 1 and 1"_ $\rightarrow$ `+1.00 -1.00 x 001`, _"Left eye is -1 2 40"_ $\rightarrow$ `OS -1.00 -2.00 x 040`, _"Right eye is -2.50 -0.75 180 2.00 64"_ $\rightarrow$ `OD -2.50 -0.75 x 180 Add +2.00 PD 64`). Unsigned cylinder still follows the minus-cylinder convention. An unsigned sphere is proposed as plus and flagged for review, because that sign was not spoken. A hundredths cylinder is the exception: _"1 to 15 and 40"_, _"1 too 15 and 40"_, and _"1 two 15 and 40"_ are the same as _"1 2 15 and 40"_ and are written as `+1.00 -2.15 x 040`. _"1 1 and 40"_ stays a reviewed plus proposal.
    - **Contact Lens Examination, Brands & Over-Refraction**:
      - Standardizes contact lens specifications (Brand, Modality, Base Curve, Diameter, Sphere, Cylinder, Axis, Add Power) e.g., `Biofinity OD: Toric / BC 8.7 / Dia 14.5 / -2.00 -1.25 x 180`.
      - Contact lens over-refraction (`CL OR OD: plano -0.50 x 010 -> 20/20`, `CL OR OS: +0.25 -> 20/20`).
-     - **Intelligent Brand & Acoustic Matcher (`contact_lens_catalog.py`)**: Master catalog of 35+ commercial contact lenses across Johnson & Johnson, Alcon, CooperVision, Bausch + Lomb, and Specialty labs (RGP, Scleral, Ortho-K, Hybrid) with FDA material group, Dk/t, water content, base curves, diameters, and modalities. Resolves severe ASR acoustic phonetic slips (*"daily's total won toric"* $\rightarrow$ `Dailies Total 1 for Astigmatism`, *"bio affinity toric"* $\rightarrow$ `Biofinity Toric`, *"aqua view oasis"* $\rightarrow$ `Acuvue Oasys`, *"clarity one day"* $\rightarrow$ `Clariti 1 Day`, *"precision won"* $\rightarrow$ `Precision1`, *"total thirty toric"* $\rightarrow$ `Total 30 for Astigmatism`) while enforcing zero false positives on negative controls.
+     - **Intelligent Brand & Acoustic Matcher (`contact_lens_catalog.py`)**: Master catalog of 35+ commercial contact lenses across Johnson & Johnson, Alcon, CooperVision, Bausch + Lomb, and Specialty labs (RGP, Scleral, Ortho-K, Hybrid) with FDA material group, Dk/t, water content, base curves, diameters, and modalities. Resolves severe ASR acoustic phonetic slips (*"daily's total won toric"* $\rightarrow$ `Dailies Total 1 for Astigmatism`, *"bio affinity toric"* $\rightarrow` `Biofinity Toric`, *"aqua view oasis"* $\rightarrow` `Acuvue Oasys`, *"clarity one day"* $\rightarrow` `Clariti 1 Day`, *"precision won"* $\rightarrow` `Precision1`, *"total thirty toric"* $\rightarrow` `Total 30 for Astigmatism`) while enforcing zero false positives on negative controls.
    - **Prism Diopter & Binocular Alignment**: Parses horizontal (`BI`, `BO`) and vertical (`BU`, `BD`) prism powers with the prism delta symbol (`Δ`), supporting monocular prescriptions (`2Δ BO OD`, `1.5Δ BU OD`) and compound horizontal/vertical prisms (`2Δ BO 1.5Δ BU`).
-   - **Corneal Keratometry (K-Readings)**: Standardizes manual and automated keratometry diopters and principal meridians into flat K, steep K, and corneal astigmatism cylinder (`K OD: 43.00 @ 180 / 44.25 @ 090`, `K OS: 42.75 @ 005 / 44.50 @ 095`).
-   - **Pachymetry & Tear Breakup Time (TBUT)**:
-     - Ultrasound Central Corneal Thickness (CCT): Standardizes micrometer measurements (`CCT: 515 OD, 520 OS µm`, `CCT: 540 OU µm`).
-     - Tear Film Breakup Time: Fluorescein sodium breakup times in seconds (`TBUT: 4s OD, 3s OS`, `TBUT: 5s OU`).
-   - **Tonometry (IOP)**: Goldmann Applanation Tonometry (GAT), Tonopen, iCare, and Non-Contact Air Puff (NCT) (`IOP: 14 OD, 15 OS mmHg`, `IOP: 21 OU mmHg`). Parses spoken "brief puff" and natural-language tonometry pressure readings with digit or word-form units (e.g., _"The pressure is twenty-one millimeters of mercury in the right eye and 21 in the left eye"_ $\rightarrow$ canonical clinical shorthand `IOP: 21 OU mmHg`, _"18mm of mercury right eye and 19 left eye"_ $\rightarrow$ `IOP: 18 OD, 19 OS mmHg`). Symmetrical bilateral pressures automatically resolve to `OU`. Generates discrete monocular HL7 FHIR R4 Observations with LOINC `55284-4` (_Intraocular pressure_).
-   - **Dynamic Cup-to-Disc (C/D) Ratio**: Scalar symmetric (`C/D 0.3 OU`), monocular asymmetric (`C/D: 0.3 OD, 0.7 OS`), and biaxial horizontal/vertical ratios (`C/D OD 0.4H/0.45V`, `C/D OS 0.5H/0.7V (inf notch)`) with neuroretinal rim notching notes (`inf notch`, `sup notch`) across all 5 languages. The glaucoma-suspect flag uses the same $\ge 0.65$ cutoff as CDS, applied to a scalar ratio or to the vertical meridian when one was parsed. Horizontal enlargement alone does not set the flag. LOINC `70949-3`.
+   - **Corneal Keratometry (K-Readings) & Curvature Radius (Phase 2)**:
+     - Standardizes manual and automated keratometry diopters and principal meridians into flat K, steep K, and corneal astigmatism cylinder (`K OD: 43.00 @ 180 / 44.25 @ 090`, `K OS: 42.75 @ 005 / 44.50 @ 095`).
+     - Standardizes radius of curvature in millimeters (`r1 7.85 mm, r2 7.60 mm`), delta K (`ΔK 1.25 D WTR`), WTR/ATR astigmatism orientation, and mire image quality (`clear mires`, `distorted mires`).
+   - **Pachymetry, Corneal Thickness & DEWS II Dry Eye Diagnostics (Phase 2)**:
+     - Ultrasound & Optical Central Corneal Thickness (CCT): Standardizes micrometer measurements (`CCT: 515 OD, 520 OS µm`, `CCT: 540 OU µm`).
+     - Thinnest Corneal Thickness (`TCT: 510 OD, 515 OS µm`, local code `thinnest-corneal-thickness`), Epithelial Thickness Mapping (`Epi map: 52 OD, 50 OS µm`), and measurement modality capture (`USP`, `OCT`, `Pentacam`). Central corneal thickness stays on LOINC `71813-0`.
+     - Fluorescein Tear Film Breakup Time: Breakup times in seconds (`TBUT: 4s OD, 3s OS`, `TBUT: 5s OU`, LOINC `71811-4`) and Schirmer test (`Schirmer: 12 mm OD, 10 mm OS`, LOINC `70957-6`).
+     - TFOS DEWS II Diagnostic Battery: Non-Invasive TBUT (`NIBUT: 6s OD, 7s OS`, local code `nibut`), Tear Meniscus Height (`TMH: 0.15mm OD, 0.20mm OS`), Tear Osmolarity (`Osmolarity: 315 OD, 308 OS mOsm/L`, LOINC `85382-0`), and qualitative MMP-9 InflammaDry immunoassay (`InflammaDry (+) OD, (-) OS`, LOINC `107455-8`).
+   - **Tonometry (IOP) & Advanced Diagnostic Modalities**:
+     - Standardizes Goldmann Applanation Tonometry (`GAT`), Perkins (`PAT`), Pascal Dynamic Contour Tonometry (`DCT`), Pneumotonometry (`Pneumo`), Schiøtz, Tono-Pen (`Tonopen`), iCare, and Non-Contact Air Puff (`NCT`) (`IOP: 14 OD, 15 OS mmHg`, `IOP (PAT): 15 OD, 16 OS mmHg`, `IOP (DCT): OD 18 mmHg`, `IOP (Pneumo): 16 OU mmHg`, `IOP (Schiotz): OD 17 mmHg`).
+     - Extracts patient posture (`sitting`, `supine`) e.g., `IOP (PAT, supine): 14 OD, 15 OS mmHg`.
+     - Extracts Tono-Pen reliability and confidence ratings (`5%`, `10%`, `>95%`, `<5%`) e.g., `IOP (Tono-Pen 5%): 15 OU mmHg`.
+     - Parses Ocular Response Analyzer (`ORA`) and Pascal DCT biomechanical parameters: Goldmann-correlated IOP (`IOPg`), Corneal-compensated IOP (`IOPcc`, LOINC `96093-0` OD / `96092-2` OS), Corneal Hysteresis (`CH`), and Ocular Pulse Amplitude (`OPA`). Generates discrete monocular HL7 FHIR R4 Observations with discrete components and clinical notes under LOINC `55284-4` (_Intraocular pressure_).
+   - **Dynamic Cup-to-Disc (C/D) Ratio**: Scalar symmetric (`C/D 0.3 OU`), monocular asymmetric (`C/D: 0.3 OD, 0.7 OS`), biaxial horizontal/vertical ratios (`C/D OD 0.4H/0.45V`, `C/D OS 0.5H/0.7V (inf notch)`), and compact meridian pairs in either order (`C/D 0.7V/0.5H`). Neuroretinal rim notching (`inf notch`, `sup notch`), ISNT rule status (`ISNT intact`, `ISNT violated`), Drance disc hemorrhage, and beta-zone peripapillary atrophy (`PPA beta`) are captured across all 5 languages. The glaucoma-suspect flag uses the same $\ge 0.65$ cutoff as CDS, applied to a scalar ratio or to the vertical meridian when one was parsed. Horizontal enlargement alone does not set the flag. LOINC `70949-3`.
+   - **Contact Lens Fit & Corneal Topography (Phase 6)**: Multifocal adds `Low` / `Med` / `High`. Toric rotation in degrees `CW` or `CCW`, including `LARS`. Soft-lens push-up `0–100%` and movement on blink `0–3 mm`. Scleral apical vault `0–1000 µm`, limbal clearance, and landing-zone blanching. RGP fluorescein: apical clearance, apical bearing, edge lift, and `3 and 9 o'clock staining`. Spherical over-refraction (`SOR +0.50`, −20 to +20 D) and spherocylindrical over-refraction (`SCOR pl/-0.75x180`). Simulated keratometry keeps flat and steep meridians with axes (`Sim K 43.50 @ 180 / 45.25 @ 090`, 30–70 D). `Kmax` is 30–90 D. `I-S` is −10 to +10 and `BAD-D` is −1 to 20. Cone morphology is nipple, oval, globus, or `PMD`. A bare keratometry pair stays keratometry. Fit measurements and `SOR` / `SCOR` use `urn:optonorm:fhir:CodeSystem:contact-lens-fit`. Topography is SNOMED `252830007` and CPT `92025`, with indices on `urn:optonorm:fhir:CodeSystem:corneal-topography`.
+   - **Binocular Vision, Motility & Confrontation (Phase 5)**: Intact motility (`EOMI`, `FROM`) and cardinal-gaze grades from −4 to −1 and +1 to +4 (`−2 IO OD`). Cranial-nerve palsy (`CN III`, `CN IV` with Bielschowsky, `CN VI` abduction deficit) and jerk or pendular nystagmus. Cover-test additions: Hirschberg, Krimsky prism, A- and V-patterns, `DVD`, `DHD`, incyclophoria, excyclophoria, and Double Maddox Rod cyclotropia. Duochrome (`R/G equal`, red or green clearer), von Graefe balance, and near point of convergence to the nose, with accommodative or penlight targets and convergence insufficiency kept apart from `CI-DME`. Pupil additions: neutral-density RAPD in log units (`RAPD 0.6 log`, 0.3–3.0), reverse RAPD, Marcus Gunn pupil, brisk/sluggish/fixed light reflex, light-near dissociation, and peaked, irregular, or corectopic pupils. Stereopsis in arcseconds (`40"`, fly only, nil stereo) for Titmus, Randot, TNO, and Lang I/II, plus Worth 4-dot fusion, diplopia, and suppression. Confrontation fields: `FTFC`, intact quadrants `ST` / `SN` / `IT` / `IN`, and hemianopia, quadrantanopia, altitudinal defect, or central scotoma. FHIR uses LOINC `79803-3` for ocular motility, SNOMED `252853008` for stereotests, SNOMED `415850001` for a Worth 4-dot-only result, and SNOMED `410560002` for confrontation fields. Grades and arcseconds use `urn:optonorm:fhir:CodeSystem:binocular-vision`.
+   - **Gonioscopy, Humphrey Fields & OCT (Phase 4)**: Shaffer grades 0–4, including four quadrants, Spaeth compound shorthand with iris insertion A–E, 5° angle steps from 5° through 45°, configuration `r` / `s` / `q` / `p` (plateau), and pigment 0–4+ (`D40r 2+`, `B15p 3+`). Scheie I–IV, angle structures `SL` / `TM` / `SS` / `CBB`, appositional versus synechial closure, PAS clock hours, and angle neovascularization. HVF `24-2` / `30-2` / `10-2` with SITA Faster matched before SITA Fast before SITA Standard, plus `MD`, `PSD`, `VFI`, GHT (`WNL`, borderline, `GHT ONL`, general reduction), and reliability (`FL 1/14`, `FP 2%`, `FN 5%`). Macular OCT (`CST`, cube volume, `IRF`, `SRF`, pigment epithelial detachment, `EZ intact` / `EZ disrupted`) and optic-nerve OCT (`RNFL`, `TSNIT`, `GCC`, `GCL-IPL`), with signal `8/10` or `Q > 20 dB`. `GHT ONL` is a perimetry category stored as `outside_normal_limits`. OCT normative status is only `within_normal_limits`, `borderline`, or `outside_normal_limits`, and OCT `ONL` is the outer nuclear layer. FHIR uses SNOMED `76949005` for gonioscopy and `103752008` for perimetry. Field indices and OCT measurements use `urn:optonorm:fhir:CodeSystem:glaucoma-diagnostics`. Retinal OCT is CPT `92134` and optic-nerve OCT is CPT `92133`.
+   - **ICDR Diabetic Retinopathy, Posterior Lesions & Ophthalmoscopy (Phase 3)**: No apparent DR (`No DR`, `NDR`), mild through very severe NPDR including the 4-2-1 rule, and high-risk versus non-high-risk PDR. Lesion tokens `IRMA`, `VB`, `NVD`, `NVE`, `PRH`, and `VH` (vitreous hemorrhage, not a Van Herick grade). Center-involved DME (`CI-DME`) is kept apart from convergence insufficiency. AREDS drusen sizes (small $<63$ µm, intermediate $63$–$125$ µm, large $>125$ µm, `RPD`), dry versus wet AMD, `GA`, `CNV`, `ERM`, `FTMH`, `CSCR`, horseshoe tear, operculated hole, retinoschisis, pavingstone, `WWOP`, macula-on/off `RRD`, and `CRAO` / `BRAO` / `CRVO` / `BRVO`. Ophthalmoscopy modality: `BIO c depression`, `BIO s depression`, `90D exam`, `78D exam`, `Goldmann 3-mirror`. FHIR uses SNOMED `53524009` for ophthalmoscopy and the ICDR severity concepts (`312903003` mild NPDR through `312907002` high-risk PDR, `721103006` when no DR is seen, `871778008` / `871781003` for center-involved and non-center-involved DME).
    - **Pupillary Examination & RAPD**: Standard findings (`PERRLA`, `PERRL (-) RAPD`), measured dynamic light reflex diameters / anisocoria (`Pupils: 4->2mm OD, 3->2mm OS`, `Pupils: 4->2mm OU`), static diameters (`Pupils: 5mm OD, 3mm OS`), and graded Relative Afferent Pupillary Defects (`2+ RAPD OS`, `1+ RAPD OD`, `trace RAPD OS`). LOINC `80315-5`, `80313-0`, and `76504-0`.
-   - **Slit Lamp Severity & Biomicroscopy Grading**: Cataract opacities (LOCS III: `Lens: 2+ NS, 1+ PSC OU`, `Lens: trace NS OU`, `Lens: 2+ NS, 1+ Cort OD`), anterior chamber cells & flare (SUN standardization: `AC: 1+ cells, trace flare`), and corneal superficial punctate keratitis (`Cornea: 2+ SPK inf OU`, `Cornea: trace SPK`). Discrete FHIR observations with SNOMED CT `414646002` (*Nuclear sclerosis*), LOINC `70950-1` (*Flare anterior chamber of eye*), and SNOMED CT `231872005` (*Superficial punctate keratitis*).
+   - **Slit Lamp Severity, Biomicroscopy Grading & Anterior Chamber (Phase 2)**:
+     - **LOCS III Continuous Decimal Grading**: Continuous decimal grading for Nuclear Opalescence (`NO 0.1`–`6.9`), Nuclear Color (`NC 0.1`–`6.9`), Cortical (`C 0.1`–`5.9`), and Posterior Subcapsular (`P 0.1`–`5.9`) cataract opacities (`Lens: LOCS III: NO 3.2, NC 3.5, C 2.0, P 1.5 OD`, local codes `nuclear-opalescence`, `nuclear-color`, `cortical`, `posterior-subcapsular`), alongside conventional integer plus grading (`Lens: 2+ NS, 1+ PSC OU`).
+     - **SUN Standardization for Anterior Chamber & Vitreous**: Standardizes anterior chamber cells including `0.5+` cells (1–5 cells per 1mm slit beam), qualitative flare terms (`faint` $\to$ 1+, `moderate` $\to$ 2+, `marked` $\to$ 3+, `intense/fibrin` $\to$ 4+), and vitreous haze (0 to 4+) (`AC: 0.5+ cells, faint flare OU`, `Vitreous haze: 2+ OD`, LOINC `70950-1`).
+     - **Anterior Chamber Depth (Van Herick 0–4)**: Standardizes peripheral anterior chamber depth across Van Herick grades 0 through 4 (`Van Herick grade 2 OD`, `Van Herick 4 OU`, SNOMED CT `363948008`). Millimeter anterior-chamber depth and bare `VH` (vitreous hemorrhage) are not Van Herick grades.
+     - **Ocular Surface Staining**: Oxford grading scale (grades 0–V) and NEI grid score (0–15) for fluorescein and lissamine green corneal/conjunctival staining (`Cornea: Oxford grade II OD`, `NEI grid score: 4 OD`).
+     - **Slit Lamp Adnexa, Cornea, Iris & Pseudophakia**:
+       - Meibomian Gland Dysfunction grading (`MGD 2+ OU`, `MGD: 2+ OD, 1+ OS`).
+       - Conjunctival injection (0–4+), ciliary flush, and subconjunctival hemorrhage (`Conj: SCH OD`, `Conj: 2+ injection OU`, `ciliary flush OD`).
+       - Corneal infiltrates with dimensional measurements (`Corneal infiltrate: 1.5x2.0 mm OD`), punctate epithelial erosions (`PEE OU`) and persistent epithelial defects (`PED OD`), keratic precipitates (`KPs: mutton-fat OD`, `fine KPs OS`), and cornea guttae (`Cornea guttae present OU`). Negated guttae (`no guttae`) stay absent. Ungraded PCO stays `present`. A YAG status is recorded only when the note says open, patent, or clear.
+       - Pseudophakic IOL status and centration (`PCIOL well-centered OD`, `ACIOL OS`, SNOMED CT `261665006`), posterior capsular opacification (`PCO 2+ OS`, SNOMED CT `415252003`), and YAG laser capsulotomy status (`patent YAG capsulotomy OS`).
    - **Strabismus & Binocular Alignment**: Cover test distance and near phorias (`CT: dist 4Δ EP, near 8Δ EP`, `CT: dist 4Δ XP, near 10Δ XP`), monocular and alternating tropias (`15Δ LXT`, `20Δ RET`, `10Δ XT`), and orthophoria (`Ortho dist & near`, `Ortho dist`, `Ortho near`, `Ortho`). Discrete FHIR observation with LOINC `70951-9` (*Ocular alignment*).
    - **Clinical Grading & Modifiers**: Standardizes clinical severity grading (`one plus` $\rightarrow$ `1+`, `two plus` $\rightarrow$ `2+`, `three plus` $\rightarrow$ `3+`, `four plus` $\rightarrow$ `4+`, `grade one` $\rightarrow$ `grade 1`).
    - **Fixed-Phrase Lexicon**: Maps colloquial findings to canonical acronyms (`PERRLA`, `PERRL (-) RAPD`, `EOMI`, `DFE`, `DFE: normal`, `C/D 0.3 OU`, `AC: D&Q OU, no c/f`, `Lens: trace NS OU`, `Cornea: clear OU`, `Macula: flat, dry OU`, `Retina: flat, intact OU`, `Vitreous: clear OU`, `Conjunctiva: quiet OU`, `Iris: normal pattern OU`, `Lids/Lashes: clear OU`).
@@ -95,7 +126,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
           - *"fundus copy"* $\rightarrow$ `fundoscopy` (SNOMED `252832004` / CPT `92201`)
           - *"psycho plegic"* / *"cycle plegic"* $\rightarrow$ `cycloplegic` (SNOMED `252888008`)
           - *"nuclear balance"* / *"binocular ballast"* $\rightarrow$ `binocular balance` (SNOMED `252891004`)
-          - *"gonio scopy"* $\rightarrow$ `gonioscopy` (SNOMED `65408006` / CPT `92020`)
+          - *"gonio scopy"* $\rightarrow$ `gonioscopy` (SNOMED `76949005` / CPT `92020`)
           - *"written copy"* / *"retina scopy"* $\rightarrow$ `retinoscopy` (SNOMED `39155005`)
         - **Strict Negative Discrimination**: Non-exam phrases (e.g. *"the patient spent money on glasses"*, *"blood pressure check"*, *"patient has manifest anxiety"*) yield scores below threshold and are never falsely modified (0.00% false replacement rate).
       - The preprocessor calls the matcher only after the pinned acoustic regexes, so gold strings such as `tonometer` and `manifest refraction` stay put. Running text uses a stricter compound cutoff ($\ge 0.92$) than isolated lookup ($\ge 0.78$). Already-correct spacing variants (`auto refraction`, `auto refractor`) are aliases and are not rewritten. Residual slips such as *"gonyo scopy"* still become `gonioscopy`.
@@ -206,21 +237,28 @@ flowchart TD
             C --> D5[Keratometry Grammar<br/>K Flat, Steep, Cyl, Axis]
             C --> D6[Cornea Grammar<br/>CCT in µm, TBUT in s]
             C --> D7[Dynamic C/D Ratio Grammar<br/>Scalar, Asymmetric, Biaxial, Notching]
-            C --> D8[Pupil & RAPD Grammar<br/>Diameters, Light Reflex, Graded RAPD]
+            C --> D8[Pupil & RAPD Grammar<br/>Diameters, ND RAPD, LND, Shape]
             C --> D9[Slit Lamp Grading Grammar<br/>LOCS III Cataract, SUN AC Cells/Flare, SPK]
-            C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Phorias, Tropias, Ortho]
+            C --> D10[Strabismus & Alignment Grammar<br/>Cover Test, Hirschberg, NPC, Duochrome]
             C --> D11[Fixed Clinical Phrase Lexicon]
-            C --> D12[Contact Lens Grammar<br/>Specs, Brand, Modality, Over-Refraction]
+            C --> D12[Contact Lens Grammar<br/>Fit, Rotation, Vault, Over-Refraction]
             C --> D13[Master Catalogs & Intelligent Matchers<br/>Exams, Anatomy, Medications & Contact Lenses]
             C --> D14[Retina & Posterior Segment Grammar<br/>Optic Disc Sharpness, Drusen/AMD, Retinopathy]
             C --> D15[Dry Eye / DEWS II Grammar<br/>Schirmer Test, MGD Expressibility Grade, TMH]
+            C --> D16[Gonioscopy Grammar<br/>Shaffer, Spaeth, Scheie, PAS]
+            C --> D17[Perimetry Grammar<br/>HVF 24-2/30-2/10-2, MD, PSD, VFI, GHT]
+            C --> D18[OCT Grammar<br/>CST, RNFL, IRF/SRF, Normative Status]
+            C --> D19[Motility Grammar<br/>EOMI, FROM, Gaze Grades, CN Palsy]
+            C --> D20[Stereopsis Grammar<br/>Arcseconds, Titmus, Worth 4-Dot]
+            C --> D21[Confrontation Grammar<br/>FTFC, Quadrants, Hemianopia]
+            C --> D22[Topography Grammar<br/>Sim K, Kmax, I-S, BAD-D]
         end
 
-        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 & D12 & D13 & D14 & D15 --> E[Post-Hoc Verification Pipeline]
+        D1 & D2 & D3 & D4 & D5 & D6 & D7 & D8 & D9 & D10 & D11 & D12 & D13 & D14 & D15 & D16 & D17 & D18 & D19 & D20 & D21 & D22 --> E[Post-Hoc Verification Pipeline]
 
         subgraph Safety Guards
             E --> F1[Numeric Entailment Guard<br/>Zero Invented Numbers, Multilingual & Roman Numerals]
-            E --> F2[Physiological Range Guard<br/>0.25D, 1-180° Axis, CCT, TBUT, C/D, Pupils, Grading, Δ]
+            E --> F2[Physiological Range Guard<br/>0.25D, 1-180° Axis, CCT, TBUT, C/D, Pupils, Grading, Δ, Spaeth, HVF, OCT]
         end
 
         F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
@@ -273,6 +311,10 @@ The URI `http://loinc.org` explicitly declares to receiving EHR systems (e.g., E
 | **SNOMED CT** | `http://snomed.info/sct` | SNOMED International | Anatomical sites & laterality (`Right eye`, `Left eye`), qualitative findings, correction state | **Free in Member Countries** (US, UK, Germany, Canada, Australia, Spain, Netherlands, Switzerland, etc.). Foundational concept references are royalty-free. |
 | **UCUM** | `http://unitsofmeasure.org` | Regenstrief / UCUM Organization | Standardized clinical units of measure (`[diop]`, `deg`, `mm[Hg]`, `um`, `s`, `[p'diop]`) | **Public domain / Open Source**. Completely free to use without registration or fees. |
 | **Keratometry meridians** | `urn:optonorm:fhir:CodeSystem:keratometry-meridian` | OptoNorm | Flat and steep principal meridians (`flat-meridian`, `steep-meridian`) in degrees on the keratometry Observation | Local code system, embedded offline. Used because LOINC panel `8626-6` has no axis member. |
+| **Glaucoma diagnostics** | `urn:optonorm:fhir:CodeSystem:glaucoma-diagnostics` | OptoNorm | Perimetry indices (`mean-deviation`, `pattern-standard-deviation`, `visual-field-index`, `glaucoma-hemifield-test`) and OCT measurements on the gonioscopy, perimetry, and OCT observations | Local code system, embedded offline. Gonioscopy itself is SNOMED `76949005` and perimetry is SNOMED `103752008`. Retinal OCT is CPT `92134`; optic-nerve OCT is CPT `92133`. |
+| **Binocular vision** | `urn:optonorm:fhir:CodeSystem:binocular-vision` | OptoNorm | Motility grades, stereoacuity in arcseconds, Worth 4-dot result, and confrontation quadrants or defects | Local code system, embedded offline. Ocular motility is LOINC `79803-3`. Stereotests are SNOMED `252853008` and Worth four-dot test is SNOMED `415850001`. Confrontation visual field test is SNOMED `410560002`. |
+| **Contact lens fit** | `urn:optonorm:fhir:CodeSystem:contact-lens-fit` | OptoNorm | Multifocal add, toric rotation, push-up, movement, vault, fluorescein pattern, and spherical or spherocylindrical over-refraction | Local code system, embedded offline. Used for dynamic fit findings. |
+| **Corneal topography** | `urn:optonorm:fhir:CodeSystem:corneal-topography` | OptoNorm | Sim K, Kmax, I-S, BAD-D, and cone morphology on the topography Observation | Local code system, embedded offline. The procedure is SNOMED `252830007` and CPT `92025`. |
 
 ### 3. Internal Architecture & Zero-Token Runtime
 
@@ -695,17 +737,24 @@ optonorm/
 │       ├── grammars/
 │       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
+│       │   ├── confrontation_fields.py # FTFC, intact quadrants, hemianopia, and central scotoma
 │       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
 │       │   ├── dry_eye.py          # Ocular surface & DEWS II dry eye (Schirmer test, MGD expressibility grade, TMH) parser
 │       │   ├── fillers.py          # Closed-class copula fillers, bare laterality, and number-joining conjunctions
 │       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
+│       │   ├── gonioscopy.py       # Shaffer, Spaeth, Scheie, angle structures, PAS, and NVA
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
 │       │   ├── keratometry.py      # Corneal Keratometry (K-readings: flat/steep D @ axis) parser
+│       │   ├── motility.py         # EOMI, FROM, cardinal gaze grades, cranial-nerve palsy, nystagmus
+│       │   ├── oct.py              # Macular and optic-nerve OCT: CST, RNFL, fluid, layers, signal
+│       │   ├── perimetry.py        # HVF program, SITA strategy, MD/PSD/VFI, GHT, and reliability
 │       │   ├── prism.py            # Horizontal (BI/BO) and vertical (BU/BD) prism diopter parser
 │       │   ├── pupils.py           # Pupillary exam, dynamic diameters, anisocoria & graded RAPD parser
 │       │   ├── refraction.py       # Refraction, cylinder stutter, stage classification, and add power parser
-│       │   ├── retina.py           # Posterior segment & retina: optic disc sharpness, macular drusen/AMD, diabetic retinopathy
+│       │   ├── retina.py           # Posterior segment: ICDR, DME, lesions, ophthalmoscopy, disc, drusen/AMD
+│       │   ├── stereopsis.py       # Stereoacuity, Titmus/Randot/TNO/Lang, and Worth 4-dot
+│       │   ├── topography.py       # Sim K, Kmax, I-S, BAD-D, and cone morphology
 │       │   ├── templates.py        # Abstract Parametric Regex Templates (universal clinical syntax topology)
 │       │   └── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
 │       ├── guards/
@@ -736,6 +785,7 @@ optonorm/
 │   ├── test_accuracy_and_fixes_transcripts.py # Real-world transcript accuracy, clinical shorthands & dysfluency regression tests
 │   ├── test_acoustic_repair_exams.py # Unit and integration tests for clinical exam acoustic malapropism repairs
 │   ├── test_alignment.py           # Unit tests for strabismus and binocular alignment grammar
+│   ├── test_binocular_phase5.py    # Motility, stereopsis, confrontation, pupils, and alignment extras
 │   ├── test_anatomy_catalog.py     # Anatomy collocation repairs and 50-sentence negative battery
 │   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
 │   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
@@ -745,7 +795,9 @@ optonorm/
 │   ├── test_cd_ratio.py            # Unit tests for dynamic C/D ratio grammar and FHIR mapping
 │   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
 │   ├── test_clinical_alerts.py     # Clinical Decision Support (CDS) rule evaluation & critical triage tests
+│   ├── test_collisions.py          # Multilingual token collision & disambiguation test suite
 │   ├── test_contact_lens.py        # Contact lens parameters, over-refraction, and vertex distance tests
+│   ├── test_contact_lens_phase6.py # Fit dynamics, SOR/SCOR, topography indices, and FHIR codes
 │   ├── test_contact_lens_catalog.py# Master contact lens catalog, acoustic repair, and zero-false-positive tests
 │   ├── test_dotphrase.py           # Dotphrase expander & auto-complete tests
 │   ├── test_exam_catalog.py        # Unit tests for Master Clinical Exam Catalog, categories & metadata
@@ -760,6 +812,7 @@ optonorm/
 │   ├── test_i18n_fr.py             # French locale unit and transcript integration tests
 │   ├── test_i18n_it.py             # Italian locale unit and transcript integration tests
 │   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
+│   ├── test_latency_redos_gate.py  # 1,000-word pattern latency and ReDoS gate for value-gap grammars
 │   ├── test_medications_catalog.py # Medication matcher, beta-blocker alert, FHIR MedicationStatement, negative battery
 │   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
 │   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
@@ -774,8 +827,11 @@ optonorm/
 │   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
 │   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
 │   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
+│   ├── test_refraction_phase1b.py  # Advanced Refraction, Cycloplegia, Retinoscopy & Lensometry test suite
 │   ├── test_refraction_stage_and_acoustic_repair.py # Refraction stage disambiguation & Acoustic Repair 2.0
 │   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
+│   ├── test_glaucoma_phase4.py  # Gonioscopy, HVF, OCT, range guards, and FHIR code tests
+│   ├── test_posterior_phase3.py # ICDR, DME, posterior lesions, ophthalmoscopy, and disc-feature tests
 │   ├── test_retina_and_dry_eye.py  # Retina and DEWS II dry eye grammar tests with FHIR mapping
 │   ├── test_streaming.py           # Chunked simulation plus word-chunk parity for every visit transcript
 │   ├── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
@@ -935,6 +991,8 @@ Interactive OpenAPI documentation will be immediately accessible at:
 ```bash
 uv run pytest -v
 ```
+
+`tests/test_latency_redos_gate.py` times the gonioscopy, perimetry, OCT, motility, stereopsis, confrontation, and topography patterns on a 1,000-word note and requires that scan to finish in under 5 ms. The same test rejects catastrophic backtracking: long runs of spaces and repeated near-matches must finish in under 25 ms.
 
 ### 5. Run the Gold Benchmark Evaluation & Slot-Level IE Metrics
 
