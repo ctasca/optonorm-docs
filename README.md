@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.39.0](https://img.shields.io/badge/version-0.39.0-blue.svg)]()
+[![Version: 0.43.1](https://img.shields.io/badge/version-0.43.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1601%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1648%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -221,10 +221,11 @@ flowchart TD
         W4[FHIR R4 Inspector & Note<br/>US Core 6.1.0 Consultation Note]
         W5[Optical Tools Suite<br/>Cyl Transposition · Vertex · Spherical Equivalent]
         W6[Community & Contributing Portal<br/>Persona Inquiries · Secure Zero-PHI Contact Hub]
+        W7[Training Workbench<br/>/training · phrase mapped to a known shorthand]
     end
 
     subgraph Service ["FastAPI Microservice Engine (Port 8000)"]
-        API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream · /v1/contact]
+        API[FastAPI Gateway<br/>/v1/normalize · /v1/fhir · /v1/normalize/stream · /v1/contact · /v1/training]
         AUTH[Authentication and audit<br/>JWT sessions, API keys, role scopes]
         CONTACT[Secure Contact Hub & Anti-Bot<br/>HMAC Time Gate · Nonce Replay Guard · Sliding Rate Limit · 90d Prune]
         B[Clinical Locale Provider & Language Inference<br/>en, fr, it, es, de]
@@ -264,12 +265,15 @@ flowchart TD
         end
 
         F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
+        TRAIN[Trained phrase rules<br/>trainer role · vocabulary:train<br/>Built-in hits win on overlap]
+        TRAIN --> G
         G --> H[Residue Detection & Optional SLM Escalation]
         H --> I[Reversible In-Place Span Replacement Engine]
     end
 
     Client <-->|REST, WebSocket, Bearer JWT or X-API-Key<br/>Host :3000 -> Container :8080 / :8000| API
     API --> AUTH --> B --> PRE --> C
+    API --> TRAIN
     API --> CONTACT
     PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
 
@@ -277,6 +281,12 @@ flowchart TD
     I --> K[Structured FHIR R4 Bundle Exporter<br/>VisionPrescription · Observations · ICD-10-CM · SNOMED CT]
     H --> L[Clinician Correction Harvesting JSONL]
 ```
+
+A trainer teaches a phrase the pipeline missed, such as `gonioscopy Shaffer grade of 4 OU`, and pairs it with a shorthand the normalizer already emits, `Shaffer 4 OU`. The same rule also accepts a short hesitation between the words, including `gonioscopy Shaffer grade of, ehmm, 4 OU`. Words the trainer typed stay required. A grade and an eye become slots. The rule does not invent a new canonical, and it does not change a gold-set item.
+
+The `trainer` role can open Batch Form, Live Stream, Live Mic, and FHIR export, plus the `/training` workbench (`vocabulary:train`). Administrators and superusers can train as well. Clinicians, scribes, auditors, and the EHR role cannot. Saved rules live in the `training_rules` table on the same database as authentication and run inside `normalize()` after the built-in grammars. A built-in hit wins when the spans overlap.
+
+Both the `/training` rule workbench and the User Administration panel feature headless, sortable, paginated data grids powered by **TanStack Table (`@tanstack/react-table`)** with Redux-controlled state (zero `useState`), global multi-field search, finding-type category faceting, and batch selection.
 
 ---
 
@@ -727,6 +737,7 @@ optonorm/
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   ├── routes_auth.py      # /v1/auth login, refresh, users, API keys, and audit
 │       │   ├── routes_contact.py   # /v1/contact/token (HMAC time gate) and /v1/contact (inquiry submission & honeypot drop)
+│       │   ├── routes_training.py  # /v1/training preview, save, list, disable, delete, and export
 │       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
 │       │   └── settings.py         # CORS, transcript cap, and authentication settings
 │       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
@@ -742,6 +753,15 @@ optonorm/
 │       │   ├── buffer.py           # Sliding window buffer with discourse boundaries, bilateral holdback & zero-latency flushing
 │       │   ├── models.py           # Streaming data models (StreamingEventType, StreamingChunk, StreamingEvent)
 │       │   └── offset_tracker.py   # Bidirectional character offset interval tree for stream-to-normalized coordinate mapping
+│       ├── training/               # Taught phrase rules for findings the pipeline already emits
+│       │   ├── __init__.py         # Training package
+│       │   ├── models.py           # Saved rule record and induction errors
+│       │   ├── registry.py         # Render and validate handlers for every typed finding
+│       │   ├── inducer.py          # Align one phrase to one known shorthand
+│       │   ├── apply.py            # Match enabled rules and render the existing shorthand
+│       │   ├── guards.py           # Private gold-set trial before a rule is saved
+│       │   ├── runtime.py          # In-memory cache and the private overlay
+│       │   └── storage.py          # Save, list, disable, delete, and JSONL export
 │       ├── grammars/
 │       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
@@ -845,6 +865,7 @@ optonorm/
 │   ├── test_retina_and_dry_eye.py  # Retina and DEWS II dry eye grammar tests with FHIR mapping
 │   ├── test_streaming.py           # Chunked simulation plus word-chunk parity for every visit transcript
 │   ├── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
+│   ├── test_training_rules.py      # Taught phrase for every vocabulary, trainer role, and training API
 │   └── test_vision_prescription_and_icd10.py # HL7 FHIR R4 VisionPrescription & automated ICD-10 diagnostic coding tests
 ├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
 │   ├── src/
@@ -857,10 +878,11 @@ optonorm/
 │   │   │   ├── inspector/          # ClinicalDiffViewer (inline/side-by-side diff) & FindingsTable
 │   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
 │   │   │   ├── OpticalTools/       # Optical calculators: Cylinder transposition, vertex distance & spherical equivalent
-│   │   │   └── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
+│   │   │   ├── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
+│   │   │   └── training/           # Training workbench: inducer, slot preview, rule list, export
 │   │   ├── data/                   # Multilingual clinical presets across 5 languages
 │   │   ├── lib/                    # Authenticated fetch client, TanStack QueryClient, terminology mappings
-│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, contactSlice, uiSlice)
+│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, contactSlice, trainingSlice, uiSlice)
 │   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
 │   │   ├── App.tsx                 # Root application cockpit layout
 │   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
@@ -922,7 +944,7 @@ A comprehensive [Makefile](Makefile) is included to automate all quality assuran
 ```bash
 make help           # Display interactive menu with all available targets
 make check          # Run full code quality pipeline (ruff check + format check)
-make test           # Run complete test suite with pytest (1480 passed, 1 skipped)
+make test           # Run complete test suite with pytest (1647 passed, 1 skipped)
 make test-streaming # Run real-time streaming & ambient scribing test suite (59 tests)
 make benchmark      # Run gold benchmark (accuracy, hallucinations, latency)
 make dev            # Start development FastAPI server with auto-reload (:8000)
