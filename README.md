@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.44.0](https://img.shields.io/badge/version-0.44.0-blue.svg)]()
+[![Version: 0.45.0](https://img.shields.io/badge/version-0.45.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1653%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1659%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -49,7 +49,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Contact Lens Examination, Brands & Over-Refraction**:
      - Standardizes contact lens specifications (Brand, Modality, Base Curve, Diameter, Sphere, Cylinder, Axis, Add Power) e.g., `Biofinity OD: Toric / BC 8.7 / Dia 14.5 / -2.00 -1.25 x 180`.
      - Contact lens over-refraction (`CL OR OD: plano -0.50 x 010 -> 20/20`, `CL OR OS: +0.25 -> 20/20`).
-     - **Intelligent Brand & Acoustic Matcher (`contact_lens_catalog.py`)**: Master catalog of 35+ commercial contact lenses across Johnson & Johnson, Alcon, CooperVision, Bausch + Lomb, and Specialty labs (RGP, Scleral, Ortho-K, Hybrid) with FDA material group, Dk/t, water content, base curves, diameters, and modalities. Resolves severe ASR acoustic phonetic slips (*"daily's total won toric"* $\rightarrow$ `Dailies Total 1 for Astigmatism`, *"bio affinity toric"* $\rightarrow` `Biofinity Toric`, *"aqua view oasis"* $\rightarrow` `Acuvue Oasys`, *"clarity one day"* $\rightarrow` `Clariti 1 Day`, *"precision won"* $\rightarrow` `Precision1`, *"total thirty toric"* $\rightarrow` `Total 30 for Astigmatism`) while enforcing zero false positives on negative controls.
+     - **Intelligent Brand & Acoustic Matcher (`contact_lens_catalog.py`)**: Master catalog of 35+ commercial contact lenses across Johnson & Johnson, Alcon, CooperVision, Bausch + Lomb, and Specialty labs (RGP, Scleral, Ortho-K, Hybrid) with FDA material group, Dk/t, water content, base curves, diameters, and modalities. Resolves severe ASR acoustic phonetic slips (*"daily's total won toric"* $\rightarrow$ `Dailies Total 1 for Astigmatism`, *"bio affinity toric"* $\rightarrow$ `Biofinity Toric`, *"aqua view oasis"* $\rightarrow$ `Acuvue Oasys`, *"clarity one day"* $\rightarrow$ `Clariti 1 Day`, *"precision won"* $\rightarrow$ `Precision1`, *"total thirty toric"* $\rightarrow$ `Total 30 for Astigmatism`) while enforcing zero false positives on negative controls.
    - **Prism Diopter & Binocular Alignment**: Parses horizontal (`BI`, `BO`) and vertical (`BU`, `BD`) prism powers with the prism delta symbol (`Δ`), supporting monocular prescriptions (`2Δ BO OD`, `1.5Δ BU OD`) and compound horizontal/vertical prisms (`2Δ BO 1.5Δ BU`).
    - **Corneal Keratometry (K-Readings) & Curvature Radius (Phase 2)**:
      - Standardizes manual and automated keratometry diopters and principal meridians into flat K, steep K, and corneal astigmatism cylinder (`K OD: 43.00 @ 180 / 44.25 @ 090`, `K OS: 42.75 @ 005 / 44.50 @ 095`).
@@ -265,28 +265,41 @@ flowchart TD
         end
 
         F1 & F2 --> G[Conflict & Overlap Resolver<br/>Priority-Ranked Non-Overlapping Spans]
-        TRAIN[Trained phrase rules<br/>trainer role · vocabulary:train<br/>Built-in hits win on overlap]
+        TRAIN["Trained phrase rules<br/>Built-in (tier 0) → Personal (tier 1) → Shared (tier 2)"]
         TRAIN --> G
         G --> H[Residue Detection & Optional SLM Escalation]
         H --> I[Reversible In-Place Span Replacement Engine]
     end
 
-    Client <-->|REST, WebSocket, Bearer JWT or X-API-Key<br/>Host :3000 -> Container :8080 / :8000| API
+    Client <-->|"REST, WebSocket, Bearer JWT or X-API-Key<br/>Host :3000 → Container :8080 / :8000"| API
     API --> AUTH --> B --> PRE --> C
     API --> TRAIN
     API --> CONTACT
-    PRE -. Exact Raw Span Offsets (SpanCoordinateMapper) .-> I
+    PRE -.->|"Exact Raw Span Offsets (SpanCoordinateMapper)"| I
 
     I --> J[Normalized EHR Clinical Text]
     I --> K[Structured FHIR R4 Bundle Exporter<br/>VisionPrescription · Observations · ICD-10-CM · SNOMED CT]
     H --> L[Clinician Correction Harvesting JSONL]
 ```
 
-A trainer teaches a phrase the pipeline missed, such as `gonioscopy Shaffer grade of 4 OU`, and pairs it with a shorthand the normalizer already emits, `Shaffer 4 OU`. The same rule also accepts a short hesitation between the words, including `gonioscopy Shaffer grade of, ehmm, 4 OU`. Words the trainer typed stay required. A grade and an eye become slots. The rule does not invent a new canonical, and it does not change a gold-set item.
+A trainer or clinician teaches a phrase the pipeline missed, such as `gonioscopy Shaffer grade of 4 OU`, and pairs it with a shorthand the normalizer already emits, `Shaffer 4 OU`. The same rule also accepts a short hesitation between the words, including `gonioscopy Shaffer grade of, ehmm, 4 OU`. Words the trainer typed stay required. A grade and an eye become slots. The rule does not invent a new canonical, and it does not change a gold-set item.
 
-The `trainer` role can open Batch Form, Live Stream, Live Mic, and FHIR export, plus the `/training` workbench (`vocabulary:train`). Administrators and superusers can train as well. Clinicians, scribes, auditors, and the EHR role cannot. Saved rules live in the `training_rules` table on the same database as authentication and run inside `normalize()` after the built-in grammars. A built-in hit wins when the spans overlap.
+### Training Scopes & Precedence
+
+OptoNorm supports two distinct levels of training vocabulary:
+- **Shared Training Rules (`vocabulary:train`)**: Managed by trainers, administrators, and superusers. These rules apply globally across all normalization requests (`owner_user_id IS NULL`) and undergo gold-set conflict verification.
+- **Personal Training Phrases (`vocabulary:personal`)**: Accessible to clinicians, scribes, and trainers. Allows clinicians to teach custom, doctor-specific phrases that apply strictly to their own transcripts (`owner_user_id = principal.id`). Personal rules skip the baseline gold-set gate and never contaminate other clinicians' transcripts or process-wide catalogs (`MEDICATION_CATALOG`, etc.).
+
+During transcript normalization, rules are dynamically composed and resolved using a 3-tier precedence hierarchy:
+1. **Tier 0 (Built-in Grammars)**: Native typed parsers always win over learned rules when spans conflict.
+2. **Tier 1 (Personal Training Rules)**: The authenticated clinician's personal phrases (`caller_context(principal.id)`) take precedence over global shared rules.
+3. **Tier 2 (Shared Training Rules)**: Baseline community rules available to all callers.
+
+When no user is authenticated or an unauthenticated CLI/API client calls the normalizer, only shared rules apply.
 
 A taught phrase can mark individual words as optional and can collect several phrases that resolve to the same shorthand. The teach form sends the locale used to preprocess the example. Catalog aliases are registered again when the process starts. Grammar skeletons stay in code. Extra clinical literals (an IOP anchor, a laterality phrase, a prism base) are stored in `grammar_tokens`, escaped, and spliced into the existing template after a named-group, latency, and gold-set check. `POST /v1/training/vocabulary` publishes one. Deleting the row restores the shipped vocabulary.
+
+Clinicians and scribes can also highlight un-normalized text directly within the **Clinical Spoken / Dictated Transcript** or **Live Stream** (when paused/stopped and not recording mic) to trigger a contextual floating action pill (`✨ Teach Phrase: "..."`) or a toolbar button that transfers the highlighted text into the rule inducer with automatic encounter locale synchronization.
 
 Both the `/training` rule workbench and the User Administration panel feature headless, sortable, paginated data grids powered by **TanStack Table (`@tanstack/react-table`)** with Redux-controlled state (zero `useState`), global multi-field search, finding-type category faceting, and batch selection.
 
@@ -388,14 +401,14 @@ Evaluated on the 907-utterance Multilingual Gold Evaluation Benchmark across Eng
 
 ### Slot-Level Information Extraction & Verbatim Integrity Metrics
 
-Evaluated across all 1,484 individual clinical slot values extracted across the 907 utterances:
+Evaluated across all 1,498 individual clinical slot values extracted across the 907 utterances:
 
 | Quality Dimension | Metric Value | Quality Gate | Status |
 |---|:---:|:---:|:---:|
-| **Slot-Level Precision** | **98.01%** | $\ge 98.0\%$ | ✅ PASS |
+| **Slot-Level Precision** | **98.03%** | $\ge 98.0\%$ | ✅ PASS |
 | **Slot-Level Recall** | **99.80%** | $\ge 98.0\%$ | ✅ PASS |
-| **Slot-Level F1-Score** | **98.90%** | $\ge 98.0\%$ | ✅ PASS |
-| **Verbatim Narrative Corruption Rate** | **1.0879%** (52 chars altered) | $0.00\%$ | ❌ FAIL |
+| **Slot-Level F1-Score** | **98.91%** | $\ge 98.0\%$ | ✅ PASS |
+| **Verbatim Narrative Corruption Rate** | **0.00%** (0 chars altered) | $0.00\%$ | ✅ PASS |
 | **Invented Numbers (Hallucination)** | **0.00%** (0 fabricated numbers) | $0.00\%$ | ✅ PASS |
 | **Negative Control False Replacements** | **0.00%** (0 / 52) | $0.00\%$ | ✅ PASS |
 
@@ -654,268 +667,9 @@ Demonstrates complete glaucoma suspect workup with family history, gonioscopy an
 - **Zero-Loss Clinical Narrative Preservation**:
   - Diagnostic and counseling discussions (glaucoma suspect status, gonioscopy angle visibility, optic disc C/D ratios with rim thinning, cataract nuclear sclerosis grades, urgency warnings) remain 100% verbatim, preventing clinician liability or loss of clinical nuance.
 - **End-to-End Real-World Test Coverage**:
-  - Test suite expanded to **283 passing tests** (including 49 streaming tests) covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages) and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
+  - Test suite expanded to **1,659 passing tests** covering real-world simulation across 40 canonical encounter transcripts (8 subspecialties across 5 languages), multi-user authentication, personal phrase training, and 155 adversarial noisy ASR benchmark items across English, French, Italian, Spanish, and German.
 - **Core Engine Package Version**:
-  - Standardized as package `optonorm==0.21.1` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
-
----
-
-## Project Structure
-
-```text
-optonorm/
-├── data/
-│   ├── gold_set.json               # 315 curated clinical & negative control utterances (English)
-│   ├── gold_set_fr.json            # 147 curated clinical & negative control utterances (French)
-│   ├── gold_set_it.json            # 147 curated clinical & negative control utterances (Italian)
-│   ├── gold_set_es.json            # 145 curated clinical & negative control utterances (Spanish)
-│   ├── gold_set_de.json            # 153 curated clinical & negative control utterances (German)
-│   ├── vocabulary_spec.json        # v2.3.0 Optometric clinical shorthand schema & canonical slot specifications (English)
-│   ├── vocabulary_spec_fr.json     # French clinical shorthand schema & canonical slot specifications
-│   ├── vocabulary_spec_it.json     # Italian clinical shorthand schema & canonical slot specifications
-│   ├── vocabulary_spec_es.json     # Spanish clinical shorthand schema & canonical slot specifications
-│   ├── vocabulary_spec_de.json     # German clinical shorthand schema & canonical slot specifications
-│   ├── noisy_asr_benchmark.json    # 155-item adversarial noisy ASR benchmark suite (negative controls & acoustic noise across 5 languages)
-│   └── transcripts/
-│       ├── asr/                    # De-identified ASR encounters, one JSON file per visit
-│       │   ├── en/                 # 4 deidentified_capture encounters
-│       │   ├── fr/                 # 1 deidentified_capture encounter
-│       │   ├── it/                 # 1 asr_pattern_transfer encounter
-│       │   ├── es/                 # 1 asr_pattern_transfer encounter
-│       │   └── de/                 # 1 asr_pattern_transfer encounter
-│       ├── edge_cases.json         # Curated clinical transcripts covering novel domains (Prism, Keratometry, CCT, TBUT - English)
-│       ├── edge_cases_fr.json      # Curated clinical edge-case transcripts (French)
-│       ├── edge_cases_it.json      # Curated clinical edge-case transcripts (Italian)
-│       ├── edge_cases_es.json      # Curated clinical edge-case transcripts (Spanish)
-│       ├── edge_cases_de.json      # Curated clinical edge-case transcripts (German)
-│       ├── visit_<lang>_cataract.json            # Cataract evaluation, LOCS III grading & keratometry (en, de, fr, es, it)
-│       ├── visit_<lang>_glaucoma.json            # Glaucoma suspect, diurnal tonometry & pachymetry (en, de, fr, es, it)
-│       ├── visit_<lang>_dry_eye.json             # Dry eye disease, TBUT, Schirmer & contact lens intolerance (en, de, fr, es, it)
-│       ├── visit_<lang>_myopia.json              # Myopic progression, subjective fine-tuning & fundoscopy (en, de, fr, es, it)
-│       ├── visit_<lang>_refraction.json          # Phoropter dialogue, astigmatic cross-cylinder & reading add (en, de, fr, es, it)
-│       ├── visit_<lang>_pediatric_strabismus.json# Pediatric optometry, strabismus cover test & prism correction (en, de, fr, es, it)
-│       ├── visit_<lang>_contact_lens.json        # Keratoconus, scleral lens fitting & corneal curvature (en, de, fr, es, it)
-│       └── visit_<lang>_comprehensive.json       # Comprehensive diabetic eye exam & presbyopia review (en, de, fr, es, it)
-├── media/
-│   ├── logo.png                    # OptoNorm project logo (transparent PNG)
-│   └── logo.svg                    # OptoNorm scalable vector project logo (SVG)
-├── reports/
-│   └── .gitkeep                    # Directory tracking for exported benchmark & audit reports
-├── scripts/
-│   ├── benchmark_eval.py           # Quantitative accuracy, slot-level F1, hallucination, and latency benchmark
-│   ├── generate_gold_set.py        # Gold benchmark dataset generator
-│   ├── generate_noisy_benchmark.py # Adversarial noisy ASR benchmark generator across 5 languages
-│   └── normalize_cli.py            # Standalone CLI tool with Markdown findings table generator
-├── src/
-│   └── opto_normalizer/
-│       ├── __init__.py             # Public API exports (normalize, export_to_fhir_bundle, Locale, ShorthandConvention)
-│       ├── fhir.py                 # HL7 FHIR R4 discrete observation & transaction bundle exporter
-│       ├── fhir_document.py        # HL7 FHIR R4 clinical document exporter (Composition & DiagnosticReport)
-│       ├── harvesting.py           # Doctor correction recorder & QLoRA dataset formatter
-│       ├── model_fallback.py       # Constrained SLM interface with strict guardrails
-│       ├── models.py               # Pydantic v2 data models (FindingType, Slots, EditSpan)
-│       ├── number_words.py         # Word-to-number, diopter, axis, clinical grading, and ASR artifact normalizers
-│       ├── pipeline.py             # Orchestration pipeline, span deduplication, replacement engine
-│       ├── residue.py              # Scans unclaimed spans for colloquial clinical intent
-│       ├── cli.py                  # Standalone console command engine ('optonorm')
-│       ├── auth/                   # Users, API keys, JWT sessions, RBAC, and audit log
-│       │   ├── __init__.py         # Auth package exports
-│       │   ├── permissions.py      # Fixed clinical roles and permission scopes
-│       │   ├── models.py           # User, API key, token, and audit records
-│       │   ├── crypto.py           # Argon2 passwords and SHA-256 API key hashes
-│       │   ├── jwt.py              # Access tokens and single-use stream tickets
-│       │   ├── audit.py            # Append-only audit rows (transcript SHA-256 only)
-│       │   ├── bootstrap.py        # Optional first administrator from the environment
-│       │   ├── commands.py         # `optonorm auth` administration commands
-│       ├── contact/                # Standalone public contact form storage, security guards, and rate limiting
-│       │   ├── __init__.py         # Contact package exports
-│       │   ├── models.py           # Immutable ContactRecord dataclass
-│       │   ├── storage.py          # Standalone SQLite and PostgreSQL storage adapters (90-day retention prune)
-│       │   └── security.py         # Anti-bot HMAC-SHA256 tokens, nonce replay cache, honeypot, sliding-window rate limiter, and PHI regex guards
-│       ├── api/                    # Production FastAPI serving & plug-and-play router
-│       │   ├── __init__.py         # Public exports (create_app, optonorm_router, get_optonorm_router)
-│       │   ├── app.py              # Standalone FastAPI factory, CORS, latency middleware, OpenAPI auth
-│       │   ├── dependencies.py     # Caller resolution and permission checks
-│       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
-│       │   ├── routes_auth.py      # /v1/auth login, refresh, users, API keys, and audit
-│       │   ├── routes_contact.py   # /v1/contact/token (HMAC time gate) and /v1/contact (inquiry submission & honeypot drop)
-│       │   ├── routes_training.py  # /v1/training preview, save, list, disable, delete, export, and vocabulary
-│       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
-│       │   └── settings.py         # CORS, transcript cap, and authentication settings
-│       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
-│       │   ├── __init__.py         # Pipeline entrypoint (preprocess_transcript)
-│       │   ├── tracker.py          # SpanCoordinateMapper non-destructive offset tracker
-│       │   ├── acoustic_repair.py  # Phonetic ASR artifact & laterality repair (e.g., "for the right eye", "OH .25", "at 180°")
-│       │   ├── punctuation_repair.py # ASR pause punctuation re-stitcher (split decimals, axes, units)
-│       │   ├── refraction_repair.py# Decimal-less diopters, compound cyl-axis shorthand & glasses measurement unpacking
-│       │   ├── repetition.py       # Clinical keyword stutter & repetition collapser
-│       │   └── self_correction.py  # Multilingual spoken self-correction & reset operator engine
-│       ├── streaming/              # Dimension 2: Real-Time Streaming & Ambient Scribing (Chunked ASR)
-│       │   ├── __init__.py         # Public streaming exports (StreamingNormalizerBuffer, OffsetTracker, StreamingChunk, StreamingEvent)
-│       │   ├── buffer.py           # Sliding window buffer with discourse boundaries, bilateral holdback & zero-latency flushing
-│       │   ├── models.py           # Streaming data models (StreamingEventType, StreamingChunk, StreamingEvent)
-│       │   └── offset_tracker.py   # Bidirectional character offset interval tree for stream-to-normalized coordinate mapping
-│       ├── training/               # Taught phrase rules for findings the pipeline already emits
-│       │   ├── __init__.py         # Training package
-│       │   ├── models.py           # Saved rule record and induction errors
-│       │   ├── registry.py         # Render and validate handlers for every typed finding
-│       │   ├── inducer.py          # Align one or more phrases to one known shorthand
-│       │   ├── apply.py            # Match enabled rules and render the existing shorthand
-│       │   ├── guards.py           # Private gold-set trial before a rule is saved
-│       │   ├── runtime.py          # In-memory cache and the private overlay
-│       │   └── storage.py          # Save rules, reload catalog aliases, and publish grammar literals
-│       ├── grammars/
-│       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
-│       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
-│       │   ├── confrontation_fields.py # FTFC, intact quadrants, hemianopia, and central scotoma
-│       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
-│       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
-│       │   ├── dry_eye.py          # Ocular surface & DEWS II dry eye (Schirmer test, MGD expressibility grade, TMH) parser
-│       │   ├── fillers.py          # Fillers, shared laterality, possessive gap, and clinical negation
-│       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
-│       │   ├── gonioscopy.py       # Shaffer, Spaeth, Scheie, angle structures, PAS, and NVA
-│       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
-│       │   ├── keratometry.py      # Corneal Keratometry (K-readings: flat/steep D @ axis) parser
-│       │   ├── motility.py         # EOMI, FROM, cardinal gaze grades, cranial-nerve palsy, nystagmus
-│       │   ├── oct.py              # Macular and optic-nerve OCT: CST, RNFL, fluid, layers, signal
-│       │   ├── perimetry.py        # HVF program, SITA strategy, MD/PSD/VFI, GHT, and reliability
-│       │   ├── prism.py            # Horizontal (BI/BO) and vertical (BU/BD) prism diopter parser
-│       │   ├── pupils.py           # Pupillary exam, dynamic diameters, anisocoria & graded RAPD parser
-│       │   ├── refraction.py       # Refraction, cylinder stutter, stage classification, and add power parser
-│       │   ├── retina.py           # Posterior segment: ICDR, DME, lesions, ophthalmoscopy, disc, drusen/AMD
-│       │   ├── stereopsis.py       # Stereoacuity, Titmus/Randot/TNO/Lang, and Worth 4-dot
-│       │   ├── topography.py       # Sim K, Kmax, I-S, BAD-D, and cone morphology
-│       │   ├── templates.py        # Abstract Parametric Regex Templates (universal clinical syntax topology)
-│       │   ├── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
-│       │   └── vocabulary.py       # Database literals spliced into code-owned grammar templates
-│       ├── guards/
-│       │   ├── entailment.py       # Post-hoc numeric entailment verification guard
-│       │   └── ranges.py           # Physiological optometric range bounds (0.25D, 1-180°, CCT, TBUT, IOP, C/D, pupils, alignment)
-│       ├── i18n/
-│       │   ├── __init__.py         # Locale & ShorthandConvention enums, provider registry
-│       │   ├── detector.py         # Zero-dependency clinical language detection heuristics
-│       │   └── locales/
-│       │       ├── base.py         # Abstract LocaleProvider base interface
-│       │       ├── en.py           # English locale provider (tokens, laterality, number words)
-│       │       ├── fr.py           # French locale provider (Monoyer, Parinaud, vigesimal numbers, clinical tokens)
-│       │       ├── it.py           # Italian locale provider (Decimi, Jaeger, compound numbers, clinical tokens)
-│       │       ├── es.py           # Spanish locale provider (Décimas, Jaeger, compound numbers, clinical tokens)
-│       │       └── de.py           # German locale provider (DIN 58220 decimal Visus, Nieden/Birkhäuser, compound numerals)
-│       └── lexicon/
-│           ├── __init__.py         # Lexicon exports and registry
-│           ├── anatomy_catalog.py  # Ocular anatomy collocation catalog and SequenceMatcher repairs
-│           ├── contact_lens_catalog.py # Master contact lens catalog (35+ commercial brands, FDA groups, Dk/t, specs, phonetic matcher)
-│           ├── exam_catalog.py     # Master clinical exam catalog & registry (26 procedures, LOINC/SNOMED/CPT metadata)
-│           ├── medications_catalog.py # Pinned ocular medication catalog, RxNorm CUIs, ocular-window matcher
-│           ├── phrases.py          # Fixed clinical phrase matcher (English)
-│           ├── phrases_fr.py       # Fixed clinical phrase entries (French)
-│           ├── phrases_it.py       # Fixed clinical phrase entries (Italian)
-│           ├── phrases_es.py       # Fixed clinical phrase entries (Spanish)
-│           └── phrases_de.py       # Fixed clinical phrase entries (German)
-├── tests/
-│   ├── test_accuracy_and_fixes_transcripts.py # Real-world transcript accuracy, clinical shorthands & dysfluency regression tests
-│   ├── test_acoustic_repair_exams.py # Unit and integration tests for clinical exam acoustic malapropism repairs
-│   ├── test_alignment.py           # Unit tests for strabismus and binocular alignment grammar
-│   ├── test_binocular_phase5.py    # Motility, stereopsis, confrontation, pupils, and alignment extras
-│   ├── test_anatomy_catalog.py     # Anatomy collocation repairs and 50-sentence negative battery
-│   ├── test_api.py                 # FastAPI endpoints, headers, and plug-and-play mounting tests
-│   ├── test_api_streaming.py       # FastAPI WebSocket (/v1/normalize/stream) and SSE (/v1/normalize/sse) tests
-│   ├── test_auth_api.py            # Login, refresh, permission gates, API keys, FHIR signing, audit hashes
-│   ├── test_auth_streaming.py      # WebSocket and SSE authentication
-│   ├── test_auth_unit.py           # Password hashes, JWT expiry, role map, stream-ticket single use
-│   ├── test_cd_ratio.py            # Unit tests for dynamic C/D ratio grammar and FHIR mapping
-│   ├── test_cli.py                 # CLI, streaming mode, file I/O, FHIR export, and demo tests
-│   ├── test_clinical_alerts.py     # Clinical Decision Support (CDS) rule evaluation & critical triage tests
-│   ├── test_collisions.py          # Multilingual token collision & disambiguation test suite
-│   ├── test_contact_api.py         # FastAPI contact endpoints (/v1/contact/token, /v1/contact), rate limits, honeypot drop, and PHI guard
-│   ├── test_contact_lens.py        # Contact lens parameters, over-refraction, and vertex distance tests
-│   ├── test_contact_lens_phase6.py # Fit dynamics, SOR/SCOR, topography indices, and FHIR codes
-│   ├── test_contact_lens_catalog.py# Master contact lens catalog, acoustic repair, and zero-false-positive tests
-│   ├── test_contact_security.py    # Cryptographic token HMAC-SHA256, nonce replay cache, IP rate limiter, and PHI regex filters
-│   ├── test_dotphrase.py           # Dotphrase expander & auto-complete tests
-│   ├── test_exam_catalog.py        # Unit tests for Master Clinical Exam Catalog, categories & metadata
-│   ├── test_exam_phrase_corpus.py  # Generated dictated exam frames for refraction, acuity, pressure, and pachymetry
-│   ├── test_fhir.py                # FHIR R4 Bundle and Observation tests
-│   ├── test_fhir_document.py       # FHIR R4 Composition, DiagnosticReport & Document Bundle tests
-│   ├── test_grading.py             # Unit tests for biomicroscopy and slit lamp severity grading
-│   ├── test_guards.py              # Entailment and range validation unit tests
-│   ├── test_i18n_de.py             # German locale unit and transcript integration tests
-│   ├── test_i18n_es.py             # Spanish locale unit and transcript integration tests
-│   ├── test_i18n_foundation.py     # Language detection, provider resolution, templates compilation tests
-│   ├── test_i18n_fr.py             # French locale unit and transcript integration tests
-│   ├── test_i18n_it.py             # Italian locale unit and transcript integration tests
-│   ├── test_i18n_risk_mitigations.py # Clinical NLP risk analysis & architectural mitigation suite
-│   ├── test_latency_redos_gate.py  # 1,000-word pattern latency and ReDoS gate for value-gap grammars
-│   ├── test_medications_catalog.py # Medication matcher, beta-blocker alert, FHIR MedicationStatement, negative battery
-│   ├── test_noisy_asr_benchmark.py # Adversarial noisy ASR benchmark suite (155 items across 5 languages)
-│   ├── test_number_words.py        # Spoken diopter, metric VA, grading, and token conversion tests
-│   ├── test_offset_tracker.py      # Bidirectional character offset tracking unit tests
-│   ├── test_filler_gold.py         # Closed-class filler, bare-laterality, and number-joining gold lines
-│   ├── test_phrase_gap_gold.py     # Qualitative phrase-gap gold lines across five locales
-│   ├── test_pipeline.py            # End-to-end normalization pipeline tests
-│   ├── test_preprocessors.py       # Unit tests for self-correction, punctuation repair & stutter collapser
-│   ├── test_pupils.py              # Unit tests for pupillary exam and graded RAPD grammar
-│   ├── test_real_transcript.py     # Real-world clinical transcript tests (Samuel, Eleanor, Harold, Maya, Layla, Anna, Nathan, Owen, Fatima, Ryan, Peter)
-│   ├── test_real_transcript_de.py  # End-to-end real German clinical transcript & FHIR export tests
-│   ├── test_real_transcript_es.py  # End-to-end real Spanish clinical transcript & FHIR export tests
-│   ├── test_real_transcript_fr.py  # End-to-end real French clinical transcript & FHIR export tests
-│   ├── test_real_transcript_it.py  # End-to-end real Italian clinical transcript & FHIR export tests
-│   ├── test_refraction_phase1b.py  # Advanced Refraction, Cycloplegia, Retinoscopy & Lensometry test suite
-│   ├── test_refraction_stage_and_acoustic_repair.py # Refraction stage disambiguation & Acoustic Repair 2.0
-│   ├── test_residue_and_fallback.py# Residue detection and model fallback tests
-│   ├── test_glaucoma_phase4.py  # Gonioscopy, HVF, OCT, range guards, and FHIR code tests
-│   ├── test_posterior_phase3.py # ICDR, DME, posterior lesions, ophthalmoscopy, and disc-feature tests
-│   ├── test_retina_and_dry_eye.py  # Retina and DEWS II dry eye grammar tests with FHIR mapping
-│   ├── test_streaming.py           # Chunked simulation plus word-chunk parity for every visit transcript
-│   ├── test_streaming_buffer.py    # Streaming buffer windowing and boundary tests
-│   ├── test_training_rules.py      # Taught phrase for every vocabulary, trainer role, and training API
-│   └── test_vision_prescription_and_icd10.py # HL7 FHIR R4 VisionPrescription & automated ICD-10 diagnostic coding tests
-├── web/                            # Interactive Clinical Web Playground (React 19 + Redux Toolkit + TanStack)
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── auth/               # Login modal, user badge, permission gate, user and API key admin
-│   │   │   ├── common/             # Reusable BrandLogo (SVG) and shared UI primitives
-│   │   │   ├── fhir/               # FhirInspector (JSON tree) & ClinicalDocumentView (US Core XHTML)
-│   │   │   ├── form/               # ClinicalInputForm (@tanstack/react-form) & PresetSelector
-│   │   │   ├── home/               # Comprehensive marketing homepage, ContributingSection (personas) & ContactSection (hub)
-│   │   │   ├── inspector/          # ClinicalDiffViewer (inline/side-by-side diff) & FindingsTable
-│   │   │   ├── layout/             # Responsive Navbar with API health & latency monitor
-│   │   │   ├── OpticalTools/       # Optical calculators: Cylinder transposition, vertex distance & spherical equivalent
-│   │   │   ├── streaming/          # StreamingSimulator with WebSocket client & Holdback HUD
-│   │   │   └── training/           # Training workbench: inducer, slot preview, rule list, export
-│   │   ├── data/                   # Multilingual clinical presets across 5 languages
-│   │   ├── lib/                    # Authenticated fetch client, TanStack QueryClient, terminology mappings
-│   │   ├── store/                  # Redux Toolkit store (authSlice, homeSlice, opticalToolsSlice, streamingSlice, normalizationSlice, contactSlice, trainingSlice, uiSlice)
-│   │   ├── styles/                 # Surgical clinical design system tokens & glassmorphic utilities
-│   │   ├── App.tsx                 # Root application cockpit layout
-│   │   └── main.tsx                # React 19 entrypoint with Redux Provider & TanStack QueryClientProvider
-│   ├── public/                     # Static assets including logo.svg favicon
-│   ├── Dockerfile                  # Multi-stage unprivileged web container (Node 22 builder + Nginx runner)
-│   ├── nginx.conf                  # Nginx configuration (SPA fallback + HTTP/WS reverse proxy)
-│   ├── package.json                # Web playground dependencies and scripts
-│   └── vite.config.ts              # Vite configuration with local dev proxy (/v1 -> :8000)
-├── cloudfare/
-│   ├── entrypoint.sh               # Cloudfare dual-process entrypoint (Nginx on 8000 + Uvicorn on 8001)
-│   ├── nginx.conf                  # Cloudfare in-container Nginx reverse proxy configuration
-│   ├── src/
-│   │   ├── env.d.ts                # Ambient type definitions for Cloudflare Workers
-│   │   └── index.ts                # Edge Worker routing (static assets, API, and WebSockets)
-│   ├── tsconfig.json               # TypeScript configuration for Cloudfare Worker
-│   └── wrangler.jsonc              # Cloudfare Wrangler deployment configuration
-├── Dockerfile                      # Multi-stage unprivileged production API container
-├── DockerfileCloudfare             # Unified multi-stage container bundling Vite React SPA and FastAPI with Nginx
-├── docker-compose.yml              # Multi-service Docker Compose stack (optonorm-api on :8000, optonorm-web on :3000)
-├── docker-compose.cloudfare.yml    # Isolated Cloudfare Compose stack (unified app, PostgreSQL 17, pgAdmin 4)
-├── .env.cloudfare.example          # Environment template for isolated Cloudfare stack
-├── docker/
-│   └── entrypoint.sh               # Creates the auth directory and drops to the optonorm user
-├── .dockerignore                   # Build artifact exclusions
-├── Makefile                        # Unified developer lifecycle & command automation (lint, test, benchmark, serve, web, cloudfare)
-├── main.py                         # Unified root entrypoint: CLI, demo, and FastAPI server runner
-├── pyproject.toml                  # Packaging, console script ('optonorm'), and dependency configuration
-├── uv.lock                         # Pinned dependency lockfile
-└── README.md                       # Complete documentation
-```
+  - Standardized as package `optonorm==0.45.0` with dynamic path resolution across all harvesting, benchmarking, and streaming pipelines.
 
 ---
 
@@ -973,10 +727,12 @@ make docker-auth-create-user USERNAME=optoroot ROLE=superuser NAME="Superuser"
 
 Root `main.py` and the installed package console script `optonorm` provide identical capabilities:
 
+#### A. Clinical Transcript Normalization & FHIR Export
+
 ```bash
 # Normalize directly from command line arguments
 uv run main.py "04:32:00: Unaided distance visual acuity is 2040 right eye and 2040 left eye."
-# or using console script (optonorm):
+# or using console script (optonorm) with explicit locale:
 uv run optonorm "acuité visuelle dix dixièmes œil droit" --locale fr
 
 # Print HL7 FHIR R4 export directly to terminal
@@ -988,6 +744,12 @@ uv run optonorm "visual acuity 20/20 right eye, IOP 14 mmHg left eye" --fhir --f
 # Export standalone US Core DiagnosticReport (LOINC 18603-1)
 uv run optonorm "OD -2.50 -0.75 x 180, IOP 16 both eyes" --fhir --fhir-format diagnostic_report
 
+# Generate Epic Hyperspace / EHR dotphrase macro (.OPTOEXAM)
+uv run optonorm "OD -2.50 -0.75 x 180, IOP 16 both eyes" --dotphrase
+
+# Select refraction FHIR format: composite (LOINC 28618-7, default) or panel (LOINC 28634-4)
+uv run optonorm "OD -2.50 -0.75 x 180" --fhir --refraction-style panel
+
 # Normalize from a text file and save normalized text and FHIR JSON to disk
 uv run main.py -i visit.txt -o normalized.txt --output-fhir bundle.json --fhir-format document
 
@@ -997,7 +759,7 @@ cat transcript.txt | uv run main.py
 # Interactive terminal diff visualizer (comparing raw ASR speech with normalized clinical shorthand)
 uv run optonorm "visual acuity 20 20 right eye, IOP 14 mmHg left eye" --diff
 
-# Real-time streaming mode over pipe or live standard input (Dimension 2)
+# Real-time streaming mode over pipe or live standard input
 cat live_stream.txt | uv run optonorm --stream --locale en
 
 # Run built-in clinical demonstration
@@ -1005,6 +767,41 @@ uv run main.py --demo
 
 # Run in interactive prompt mode
 uv run main.py
+```
+
+#### B. User, Role & API Key Administration (`auth`)
+
+```bash
+# Initialize SQLite or PostgreSQL authentication and training tables
+uv run main.py auth init-db
+
+# Create a clinician or trainer user
+uv run main.py auth create-user --username dr_smith --role clinician --name "Dr. Jane Smith, OD"
+
+# List all registered users and roles
+uv run main.py auth list-users
+
+# Deactivate a user
+uv run main.py auth deactivate-user <user_id>
+
+# Provision a machine API key (opto_live_ / opto_test_)
+uv run main.py auth create-key --name "EHR Scribe Service" --role ehr_service
+
+# Revoke an API key
+uv run main.py auth revoke-key <key_id>
+```
+
+#### C. Secure Community Inquiries & Data Retention (`contact`)
+
+```bash
+# Initialize contact inquiries table and indexes
+uv run main.py contact init-db
+
+# List recent community contact submissions
+uv run main.py contact list
+
+# Prune submissions older than retention threshold (default 90 days)
+uv run main.py contact prune --days 90
 ```
 
 ### 3. Bootstrap the FastAPI REST API Server
@@ -1290,6 +1087,17 @@ curl -X POST http://localhost:8000/v1/contact \
   }'
 ```
 
+#### 8. Training & Vocabulary Endpoints (`/v1/training`)
+
+Programmatic management for shared clinical phrases, personal doctor-specific rules, and live grammar vocabulary extensions.
+
+- **Shared Training Rules (`POST /v1/training/rules`, `GET /v1/training/rules`)**: Requires `vocabulary:train` (roles: `admin`, `trainer`, `superuser`). Taught phrases are induced into regex slot rules, checked against the gold-standard benchmark to prevent regressions, and applied globally across all normalization requests.
+- **Personal Clinician Phrases (`POST /v1/training/personal/rules`, `GET /v1/training/personal/rules`)**: Requires `vocabulary:personal` (roles: `clinician`, `technician_scribe`, `trainer`, `superuser`). Clinicians teach phrases scoped exclusively to their own user ID (`caller_context`). Personal rules take precedence over shared rules (Tier 1 > Tier 2) and skip global gold conflict checks.
+- **Dry-Run Preview**: `POST /v1/training/preview` and `POST /v1/training/personal/preview` test rule induction and slot extraction on sample dictation before committing.
+- **Rule Lifecycle**: Rules can be deactivated via `POST /v1/training/rules/{rule_id}/disable` (or `/personal/rules/{rule_id}/disable`) and permanently deleted via `DELETE /v1/training/rules/{rule_id}` (or `/personal/rules/{rule_id}`).
+- **Vocabulary Literals (`POST /v1/training/vocabulary`, `GET /v1/training/vocabulary`, `DELETE /v1/training/vocabulary/{token_id}`)**: Requires `vocabulary:train`. Slices extra clinical literals (e.g. IOP markers, laterality tokens) into grammar templates after regex safety validation.
+- **Rules Export (`GET /v1/training/export`)**: Requires `vocabulary:train`. Streams active rules in newline-delimited JSON (`application/x-ndjson`).
+
 ### Deployment limits
 
 Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1/normalize/sse`, and the WebSocket at `/v1/normalize/stream` require a Bearer access token or an `X-API-Key` header. `GET /v1/health`, `GET /v1/locales`, `GET /v1/contact/token`, and `POST /v1/contact` stay public. Set `OPTONORM_AUTH_ENABLED=false` to restore the open gateway for a private lab or an existing unauthenticated pipeline.
@@ -1297,6 +1105,8 @@ Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1
 | Control | Default | Tighten with |
 | --- | --- | --- |
 | Authentication | Required (`OPTONORM_AUTH_ENABLED=true`) | `OPTONORM_AUTH_ENABLED=false` restores the open gateway |
+| Shared vocabulary training | Requires `vocabulary:train` scope | Scoped to `admin`, `trainer`, `superuser` |
+| Personal training phrases | Requires `vocabulary:personal` scope | Scoped to authenticated user ID (`clinician`, `technician_scribe`, `trainer`, `superuser`) |
 | JWT secret | Required when authentication is on, at least 32 bytes | `OPTONORM_JWT_SECRET` |
 | Auth database | SQLite file `data/auth.db` | `OPTONORM_AUTH_DB_PATH` or `OPTONORM_AUTH_DATABASE_URL` (`postgresql://`, inherits `DATABASE_URL`) |
 | Contact database | SQLite file `data/contact.db` | `OPTONORM_CONTACT_DB_PATH` or `OPTONORM_CONTACT_DATABASE_URL` (inherits `OPTONORM_AUTH_DATABASE_URL` / `DATABASE_URL`) |
@@ -1312,7 +1122,7 @@ Authentication is on by default. `POST /v1/normalize`, `POST /v1/fhir`, `GET /v1
 - **Configuration.** Copy [`.env.example`](.env.example) to `.env` for local commands such as `make dev` and `make auth-init`. Process environment variables override that file. The Docker image does not contain `.env`. Compose, Kubernetes, and systemd should inject the same `OPTONORM_*` names from a secret manager. `OPTONORM_SECRETS_DIR` can point at a directory of secret files named `jwt_secret`, `bootstrap_admin_password`, and `auth_database_url`; environment variables override those files.
 - **Sessions.** `POST /v1/auth/login` checks an Argon2 password hash and returns a 15-minute access JWT. The 7-day refresh token is an `HttpOnly` `SameSite=Lax` cookie named `optonorm_refresh` (path `/v1/auth`). Set `OPTONORM_AUTH_COOKIE_SECURE=true` on HTTPS. `POST /v1/auth/refresh` rotates the cookie. Reuse of a rotated refresh token revokes that user's refresh tokens.
 - **API keys.** `optonorm auth create-key` prints an `opto_live_` or `opto_test_` secret once. Only the SHA-256 hash is stored. Send it as `X-API-Key`. Revocation takes effect on the next request.
-- **Roles.** `superuser` has every permission, including streaming and document signing. `admin` manages users, keys, and configuration and may normalize and export FHIR, but cannot stream or sign. `clinician` normalizes, streams, exports, signs documents, and reads their own audit events. `technician_scribe` normalizes, streams, and exports, but cannot sign. `auditor_billing` exports FHIR and reads the audit log, but cannot normalize or stream. `ehr_service` is the machine role; `--allow-sign` adds document signing to that key only.
+- **Roles.** `superuser` has every permission, including streaming and document signing. `admin` manages users, keys, and configuration, can normalize, export FHIR, and train global vocabulary (`vocabulary:train`), but cannot stream or sign. `trainer` normalizes, streams, exports FHIR, and trains shared and personal vocabulary (`vocabulary:train`, `vocabulary:personal`), but cannot sign documents. `clinician` normalizes, streams, exports, signs documents, teaches personal phrases (`vocabulary:personal`), and reads their own audit events. `technician_scribe` normalizes, streams, exports, and teaches personal phrases (`vocabulary:personal`), but cannot sign. `auditor_billing` exports FHIR and reads the audit log, but cannot normalize or stream. `ehr_service` is the machine role; `--allow-sign` adds document signing to that key only.
 - **Signed FHIR.** `document`, `composition`, and `diagnostic_report` require `fhir:sign`. The author is the caller's `practitioner_id`, and the resource contains a FHIR R4 `Provenance` entry. Transaction and collection bundles require `fhir:export`.
 - **Streams.** Browsers obtain a 60-second single-use ticket from `POST /v1/auth/stream-ticket` and connect to `/v1/normalize/stream?ticket=...`. Non-browser clients may send `Authorization: Bearer`, `X-API-Key`, or `Sec-WebSocket-Protocol: bearer, <token>`. A missing or insufficient credential closes the socket with `1008`.
 - **Audit.** Authenticated clinical requests append an audit row with the actor, role, action, client IP, and a SHA-256 of the transcript. The transcript text is not stored. Clinicians see only their own rows at `GET /v1/auth/audit`. Admins and auditors see every row. Ambient-stream inserts run on a worker thread, so a slow or failed write does not delay `reconcile` or close the socket. The log line is the error text with any Postgres URL removed.
@@ -1361,7 +1171,7 @@ OptoNorm includes a modern, production-grade clinical web playground located in 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
 │  OptoNorm Clinical Playground Cockpit                                  │
-│  [Logo] OptoNorm v0.21.1   ● API Online (0.56 ms)     [GitHub] [Theme] │
+│  [Logo] OptoNorm v0.45.0   ● API Online (0.56 ms)     [GitHub] [Theme] │
 ├───────────────────────────────────┬────────────────────────────────────┤
 │  Clinical Input & Presets         │  Live Scribe & Output Inspector    │
 │  - Patient & Practitioner ID      │  - Tabs: Visual Diff | Findings    │
