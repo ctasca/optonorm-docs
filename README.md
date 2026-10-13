@@ -5,14 +5,14 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.45.1](https://img.shields.io/badge/version-0.45.1-blue.svg)]()
+[![Version: 0.46.1](https://img.shields.io/badge/version-0.46.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1660%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1666%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-2.05%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-1.54%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -1332,6 +1332,17 @@ make cloudfare-down
    ```bash
    make deploy
    ```
+
+#### Production Performance Architecture
+
+To maintain sub-2ms response latencies and eliminate cold-start/network-hop friction across the Cloudflare Worker $\rightarrow$ Container $\rightarrow$ Neon Postgres topology:
+
+- **Container-Tuned Argon2**: Configured with OWASP-aligned parameters (`time_cost=2, memory_cost=19456, parallelism=1`) and lazy dummy hash initialization, avoiding CPU throttling on container vCPUs and preventing startup latency spikes. A successful login rewrites a stored hash that still uses older parameters, so the following sign-in uses this cost.
+- **Single-Transaction Token Rotation**: `rotate_refresh_token` loads the refresh token and user together, then revokes the old token and inserts the new one in that same transaction. Paths that do not rotate roll the transaction back. The revoke matches only a token that is still active, so a concurrent refresh is treated as reuse.
+- **In-Memory Principal TTL Cache**: 60-second thread-safe user record cache (`get_cached_user`) in the container process, eliminating redundant database round trips on consecutive authenticated `/v1` button clicks. An invalidation that arrives while a lookup is reading the database is kept, and that lookup does not write the user back into the cache.
+- **Non-Blocking Background Auditing**: Append-only audit records on `/v1/normalize`, `/v1/fhir`, and `/v1/normalize/sse` run via `BackgroundTasks` without blocking HTTP response delivery to the client.
+- **Optimistic Header Rendering**: The React SPA caches `optonorm_auth_required` in `localStorage`, rendering header navigation controls on frame 1 without waiting for network session probing.
+- **Container Instance Sizing**: Dedicated `standard-1` (1/2 vCPU, 4 GiB memory) configuration in `wrangler.jsonc` ensuring ample compute for concurrent normalization and streaming.
 
 ---
 
