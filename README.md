@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.43.2](https://img.shields.io/badge/version-0.43.2-blue.svg)]()
+[![Version: 0.44.0](https://img.shields.io/badge/version-0.44.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1648%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1653%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -285,6 +285,8 @@ flowchart TD
 A trainer teaches a phrase the pipeline missed, such as `gonioscopy Shaffer grade of 4 OU`, and pairs it with a shorthand the normalizer already emits, `Shaffer 4 OU`. The same rule also accepts a short hesitation between the words, including `gonioscopy Shaffer grade of, ehmm, 4 OU`. Words the trainer typed stay required. A grade and an eye become slots. The rule does not invent a new canonical, and it does not change a gold-set item.
 
 The `trainer` role can open Batch Form, Live Stream, Live Mic, and FHIR export, plus the `/training` workbench (`vocabulary:train`). Administrators and superusers can train as well. Clinicians, scribes, auditors, and the EHR role cannot. Saved rules live in the `training_rules` table on the same database as authentication and run inside `normalize()` after the built-in grammars. A built-in hit wins when the spans overlap.
+
+A taught phrase can mark individual words as optional and can collect several phrases that resolve to the same shorthand. The teach form sends the locale used to preprocess the example. Catalog aliases are registered again when the process starts. Grammar skeletons stay in code. Extra clinical literals (an IOP anchor, a laterality phrase, a prism base) are stored in `grammar_tokens`, escaped, and spliced into the existing template after a named-group, latency, and gold-set check. `POST /v1/training/vocabulary` publishes one. Deleting the row restores the shipped vocabulary.
 
 Both the `/training` rule workbench and the User Administration panel feature headless, sortable, paginated data grids powered by **TanStack Table (`@tanstack/react-table`)** with Redux-controlled state (zero `useState`), global multi-field search, finding-type category faceting, and batch selection.
 
@@ -737,7 +739,7 @@ optonorm/
 │       │   ├── routes.py           # APIRouter endpoints: /normalize, /fhir, /locales, /health, /normalize/stream (WS), /normalize/sse
 │       │   ├── routes_auth.py      # /v1/auth login, refresh, users, API keys, and audit
 │       │   ├── routes_contact.py   # /v1/contact/token (HMAC time gate) and /v1/contact (inquiry submission & honeypot drop)
-│       │   ├── routes_training.py  # /v1/training preview, save, list, disable, delete, and export
+│       │   ├── routes_training.py  # /v1/training preview, save, list, disable, delete, export, and vocabulary
 │       │   ├── schemas.py          # Pydantic v2 request/response schemas with clinical examples
 │       │   └── settings.py         # CORS, transcript cap, and authentication settings
 │       ├── preprocessors/          # Acoustic & Speech Dysfluency Preprocessor Pipeline
@@ -757,11 +759,11 @@ optonorm/
 │       │   ├── __init__.py         # Training package
 │       │   ├── models.py           # Saved rule record and induction errors
 │       │   ├── registry.py         # Render and validate handlers for every typed finding
-│       │   ├── inducer.py          # Align one phrase to one known shorthand
+│       │   ├── inducer.py          # Align one or more phrases to one known shorthand
 │       │   ├── apply.py            # Match enabled rules and render the existing shorthand
 │       │   ├── guards.py           # Private gold-set trial before a rule is saved
 │       │   ├── runtime.py          # In-memory cache and the private overlay
-│       │   └── storage.py          # Save, list, disable, delete, and JSONL export
+│       │   └── storage.py          # Save rules, reload catalog aliases, and publish grammar literals
 │       ├── grammars/
 │       │   ├── alignment.py        # Strabismus, cover test (distance/near phorias), tropias & orthophoria
 │       │   ├── cd_ratio.py         # Cup-to-Disc (C/D) ratio parser, asymmetric/biaxial & shorthand renderer
@@ -769,7 +771,7 @@ optonorm/
 │       │   ├── contact_lens.py     # Contact lens specifications, brands, modalities, over-refraction & vertex distance
 │       │   ├── cornea.py           # Corneal Pachymetry (CCT in µm) and Tear Breakup Time (TBUT in s) parser
 │       │   ├── dry_eye.py          # Ocular surface & DEWS II dry eye (Schirmer test, MGD expressibility grade, TMH) parser
-│       │   ├── fillers.py          # Closed-class copula fillers, bare laterality, and number-joining conjunctions
+│       │   ├── fillers.py          # Fillers, shared laterality, possessive gap, and clinical negation
 │       │   ├── grading.py          # Biomicroscopy grading: LOCS III cataract, SUN cells & flare, corneal SPK
 │       │   ├── gonioscopy.py       # Shaffer, Spaeth, Scheie, angle structures, PAS, and NVA
 │       │   ├── iop.py              # Tonometry parser, contralateral continuation & shorthand renderer
@@ -784,7 +786,8 @@ optonorm/
 │       │   ├── stereopsis.py       # Stereoacuity, Titmus/Randot/TNO/Lang, and Worth 4-dot
 │       │   ├── topography.py       # Sim K, Kmax, I-S, BAD-D, and cone morphology
 │       │   ├── templates.py        # Abstract Parametric Regex Templates (universal clinical syntax topology)
-│       │   └── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
+│       │   ├── va.py               # Visual acuity parser (Imperial Snellen, Metric 6m, pinhole, qualitative)
+│       │   └── vocabulary.py       # Database literals spliced into code-owned grammar templates
 │       ├── guards/
 │       │   ├── entailment.py       # Post-hoc numeric entailment verification guard
 │       │   └── ranges.py           # Physiological optometric range bounds (0.25D, 1-180°, CCT, TBUT, IOP, C/D, pupils, alignment)
