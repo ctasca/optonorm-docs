@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.45.0](https://img.shields.io/badge/version-0.45.0-blue.svg)]()
+[![Version: 0.45.1](https://img.shields.io/badge/version-0.45.1-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1659%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-1660%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -133,7 +133,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
       - Seamlessly anchors downstream measurement parsing (e.g., *"I focus now on the manifestion refraction minus 2.00 minus 0.50 axis 180 for the right eye"* $\rightarrow$ `I focus now on the manifest refraction OD -2.00 -0.50 x 180`) while repairing standalone exam announcements into standardized terminology without modifying adjacent narrative text.
     - **Anatomy Collocation Matcher (`anatomy_catalog.py`)**: Rewrites a structure or finding only as a collocation, never a diagnosis standing alone. *"corners otherwise clear"* $\rightarrow$ `corneas otherwise clear`, *"conjunctivitis quiet"* $\rightarrow$ `conjunctiva quiet`, *"interior chamber"* $\rightarrow$ `anterior chamber`, *"my bohemian glands"* $\rightarrow$ `meibomian glands`, *"nuclear salad"* $\rightarrow$ `nuclear sclerosis`, *"drew zen"* / *"drew sin"* $\rightarrow$ `drusen`. *"viral conjunctivitis"*, *"corners of the room"*, and *"nuclear family"* stay verbatim. Grading regexes then see the canonical English.
     - **Ocular Medication Matcher (`medications_catalog.py`)**: Small pinned catalog (latanoprost, timolol, brimonidine, dorzolamide, prednisolone / Pred Forte, proparacaine, tropicamide, Systane, aflibercept, ranibizumab) with drug class and RxNorm ingredient CUIs. Short tokens match only inside an ocular window (`drop`, `eye`, `OU`/`OD`/`OS`, `bid`/`qd`). *"latte no prost drops"* $\rightarrow$ `latanoprost`. *"six stain on the shirt"* and a person named Tim stay verbatim. French, German, Italian, and Spanish aliases cover structure names and INN drug names; English number homophones do not run on those locales.
-    - **English Number & Laterality Homophones (`number_words.py`, `refraction_repair.py`)**: Context-gated, English only. `minus`/`plus` + `to`/`too` + a diopter tail becomes `two`; `for` in the same frame becomes `four`; `axis` + `won` + a tens word becomes `one`; `right`/`left` + `guy` becomes `eye` only beside a refraction or acuity token; `oh dee` / standalone `ode` becomes `OD` as laterality. *"I went to fifty appointments"*, *"plus for the patient"*, *"axis won the game"*, and *"he owed"* stay verbatim. Every substitution is recorded on `SpanCoordinateMapper` so `original_text[raw_start:raw_end]` equals the spoken span.
+    - **English Number & Laterality Homophones (`number_words.py`, `refraction_repair.py`)**: Context-gated, English only. `minus`/`plus` + `to`/`too` + a diopter tail becomes `two`; `for` in the same frame becomes `four`; rapid refraction triplets where a signed sphere (or plano) is followed by `to`/`too`/`for` and an integer axis (`minus 1.5 to 15` $\rightarrow$ `minus 1.5 2 15` $\rightarrow$ `OS -1.50 -2.00 x 015`) become `2` or `4`; `axis` + `won` + a tens word becomes `one`; `right`/`left` + `guy` becomes `eye` only beside a refraction or acuity token; `oh dee` / standalone `ode` becomes `OD` as laterality. *"I went to fifty appointments"*, *"I went to 15 appointments"*, *"visual acuity 20 to 20"*, *"plus for the patient"*, *"axis won the game"*, and *"he owed"* stay verbatim. Every substitution is recorded on `SpanCoordinateMapper` so `original_text[raw_start:raw_end]` equals the spoken span.
 
 
 5. **Reversible Audit Trail**:
