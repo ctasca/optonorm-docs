@@ -5,14 +5,14 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.46.1](https://img.shields.io/badge/version-0.46.1-blue.svg)]()
+[![Version: 0.48.2](https://img.shields.io/badge/version-0.48.2-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-1666%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-4231%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Latency](https://img.shields.io/badge/mean%20latency-1.54%20ms-orange.svg)]()
+[![Latency](https://img.shields.io/badge/mean%20latency-1.81%20ms-orange.svg)]()
 [![Hallucinations](https://img.shields.io/badge/hallucinations-0.00%25-red.svg)]()
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL_1.1-blue.svg)](LICENSE.md)
 
@@ -105,11 +105,26 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - Spoken degree symbols: `"at 175°"` $\rightarrow$ `axis 175`, `"at 10°"` $\rightarrow$ `axis 010`
      - Phonetic acoustic near-add variants: Conversational phrasing (`"frenir"`, `"frenier"`, `"for near"`)
      - Spoken pressure units & word numbers: `"15 mm of mercury"` $\rightarrow$ `15 mmHg`, `"twenty-one millimeters of mercury"` $\rightarrow$ `21 mmHg`
+     - Distance-acuity mishearings beside an acuity word: English `"distillation acuity"` $\rightarrow$ `distance acuity`; French `"de lin"` $\rightarrow$ `de loin`; Italian `"lontanno"` $\rightarrow$ `lontano`; Spanish `"de lexos"` $\rightarrow$ `de lejos`; German `"Fernwiesus"` $\rightarrow$ `Fernvisus`
    - **Decimal-Less Diopter & Refraction Normalizer (`refraction_repair.py`)**:
      - Rapid sequence integer diopters: Normalizes unpunctuated 3-to-5 number sequences (`"-1 2 40"` $\rightarrow$ `-1.00 -2.00 x 040`, `"1 1 and 40"` $\rightarrow$ `+1.00 -1.00 x 040`, `"1 1 and 1"` $\rightarrow$ `+1.00 -1.00 x 001`, `"125 075 8"` $\rightarrow$ `-1.25 -0.75 x 008`)
      - Compound cylinder-axis concatenation: Unpacks conjoined tokens (e.g. `"-0.75x180"` $\rightarrow$ `-0.75 x 180`, `"-75120"` $\rightarrow$ `-0.75 x 120`)
      - Habitual glasses measurement dictation: Standardizes phrases like `"Glasses measured minus 125 minus 075 axis 8"` $\rightarrow$ `OD -1.25 -0.75 x 008`, and ASR headers `"Losses measures right -1?"` $\rightarrow$ `Glasses measured: OD -1.00`
      - Multi-turn contralateral refraction stitching: Correctly normalizes split turns (`"-3 - 1."` $\rightarrow$ `OS -3.00 -1.00`, `"120."` $\rightarrow$ `x 120`, `"-325."` $\rightarrow$ `OS -3.25.`, `"3.25."` $\rightarrow$ `OS -3.25.`, `"2.5 -, .75 at 90"` $\rightarrow$ `OD -2.50 -0.75 x 090`) while maintaining turn-by-turn timestamps and dialogue boundaries
+   - **Spoken Number Reshaping (`spoken_numbers.py`)**:
+     - Signed whole and compound diopters: `"minus two fifty"` $\rightarrow$ `-2.50`, `"minus zero seventy-five"` $\rightarrow$ `-0.75`, `"minus two"` $\rightarrow$ `-2.00` at the end of an eye clause
+     - Collapsed ASR quarters: `"minus 250"` $\rightarrow$ `-2.50`, `"minus 75"` / `"minus 075"` / `"minus 0 75"` $\rightarrow$ `-0.75`. A bare `75` stays `75`
+     - Whole and compound reading adds: `"plus two add"` $\rightarrow$ `plus 2.00 add`, `"plus two fifty add"` $\rightarrow$ `plus 2.50 add`
+     - Guarded fractional diopters: `"minus a quarter diopter"` $\rightarrow$ `-0.25 diopter`, `"plus half sphere"` $\rightarrow$ `+0.50 sphere`
+     - Contextual axis numbers and positional digit spelling: `"-0.75 at one eighty"` $\rightarrow$ `-0.75 axis 180`, `"axis one zero five degrees"` $\rightarrow$ `axis 105 degrees`. A short filler may sit between the preposition and the number (`"at the ten degrees"` $\rightarrow$ `axis 10`), and `"after 170 degrees"` (French *après*, Italian *dopo*, Spanish *después*, German *nach*) is an axis only when it follows a cylinder. Appointment times and keratometry meridians stay untouched
+     - Reading add with a filler: `"add the +2"` $\rightarrow$ `add +2.00` (the add word stays in front so the refraction grammar still sees it)
+     - Snellen acuity word pairs with clinical neighbor tests: `"VA twenty twenty"` $\rightarrow$ `VA 20/20`, `"twenty twenty five"` $\rightarrow$ `20/25`, `"unaided six twelve"` $\rightarrow$ `unaided 6/12`
+     - Spoken intraocular pressure integers: `"pressure sixteen both eyes"` $\rightarrow$ `pressure 16 both eyes`
+   - **Phrase Indexing and Near-Miss Rewrite Preprocessor (`phrase_repair.py`)**:
+     - Prototype surface extraction: Reduces immutable regex patterns from static phrase lexicons and dynamic caller-scoped training aliases into prototype surfaces.
+     - Sliding-window fuzzy similarity matching ($\ge 0.93$ threshold) with initial-letter pruning and token-overlap filtering.
+     - ASR compound split resolution: `"extra ocular movements in tact"` $\rightarrow$ `EOMI`.
+     - Clinical negation protection: strictly prevents rewriting negated expressions (e.g. `"extraocular movements not intact"`, `"denies pain in both eyes"`) into normal findings.
    - **Non-Destructive Bidirectional Coordinate Tracking (`SpanCoordinateMapper`)**: Dynamically records all character offset shifts during preprocessing, seamlessly mapping extracted candidate spans back to exact raw transcript character coordinates to ensure 0.00% Word Error Rate (WER) verbatim narrative preservation outside replaced clinical slots.
 
     - **Master Clinical Exam Catalog & Intelligent ASR Matcher (`exam_catalog.py`)**:
@@ -181,7 +196,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Interactive Documentation**: Auto-generated Swagger UI (`/docs`) and ReDoc (`/redoc`) with pre-configured clinical examples across all supported languages.
 
 9. **Real-Time Streaming & Ambient Scribing (Chunked ASR)**:
-   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds and commits a finding only at a real sentence boundary (`.?!` or a newline) or on flush. Conjunctions (`and`, `et`, `e`, `y`, `und`) and fixed phrases stay pending, so a bilateral measurement or an optional phrase tail is normalized with the rest of the sentence.
+   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds and commits a finding only at a real sentence boundary (`.?!` or a newline) or on flush. Conjunctions (`and`, `et`, `e`, `y`, `und`) and fixed phrases stay pending, so a bilateral measurement or an optional phrase tail is normalized with the rest of the sentence. A pause holds an unfinished diopter (`"minus two"`), a partial axis after a power (`"at one"`), and an IOP cue that is still waiting for a number. Finished speech is committed, including `"blood pressure"`, `"looking at"`, and `"see you at ten"`.
    - **Symmetrical Bilateral Holdback**: Automatically holds back uncommitted unilateral findings (IOP, Pachymetry, TBUT) across speech pauses, waiting for potential contralateral clauses before committing canonical binocular `OU` shorthand or monocular `OD`/`OS`.
    - **Bidirectional Offset Tracking (`OffsetTracker`)**: Maintains coordinate mappings between raw incoming ASR stream offsets and normalized shorthand indices across non-destructive span edits, allowing downstream UI components to map audio-aligned timestamps to transformed text.
    - **Zero-Latency Narrative Flushing**: Immediately emits conversational ambient prose outside clinical slots without buffering delays, preserving doctor-patient dialogue 100% verbatim.
@@ -843,6 +858,8 @@ uv run python scripts/benchmark_eval.py --noisy
 # Export comprehensive markdown report for CI/CD audit gates
 uv run python scripts/benchmark_eval.py --export-report reports/benchmark_report.md
 ```
+
+A passing full `pytest` run writes the test count, and a passing all-locale `make benchmark` writes the mean latency, into [`web/src/data/projectMetrics.json`](web/src/data/projectMetrics.json). The homepage hero and the shields at the top of this file read those two numbers.
 
 ---
 
