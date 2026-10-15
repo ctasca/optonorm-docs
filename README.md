@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.48.2](https://img.shields.io/badge/version-0.48.2-blue.svg)]()
+[![Version: 0.52.0](https://img.shields.io/badge/version-0.52.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-4231%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-4446%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -61,6 +61,9 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
      - TFOS DEWS II Diagnostic Battery: Non-Invasive TBUT (`NIBUT: 6s OD, 7s OS`, local code `nibut`), Tear Meniscus Height (`TMH: 0.15mm OD, 0.20mm OS`), Tear Osmolarity (`Osmolarity: 315 OD, 308 OS mOsm/L`, LOINC `85382-0`), and qualitative MMP-9 InflammaDry immunoassay (`InflammaDry (+) OD, (-) OS`, LOINC `107455-8`).
    - **Tonometry (IOP) & Advanced Diagnostic Modalities**:
      - Standardizes Goldmann Applanation Tonometry (`GAT`), Perkins (`PAT`), Pascal Dynamic Contour Tonometry (`DCT`), Pneumotonometry (`Pneumo`), Schiøtz, Tono-Pen (`Tonopen`), iCare, and Non-Contact Air Puff (`NCT`) (`IOP: 14 OD, 15 OS mmHg`, `IOP (PAT): 15 OD, 16 OS mmHg`, `IOP (DCT): OD 18 mmHg`, `IOP (Pneumo): 16 OU mmHg`, `IOP (Schiotz): OD 17 mmHg`).
+     - Rapid 2-number sequences without explicit eye tokens (`IOP 14 16`, `pressures 14 and 16`, `GAT 15 / 17 mmHg` $\rightarrow$ `IOP: 14 OD, 16 OS mmHg`).
+     - Full laterality sequence parity across all 5 languages (EN, FR, DE, IT, ES), including reversed laterality (`OS` before `OD`), binocular equivalence (`16 OU`, `both eyes`), monocular single-eye dictation (`OD 15`, `OS 18`), and German dative syntax (`am rechten Auge 16 und am linken Auge 18`).
+     - Fractional and half-unit pressures (`14.5 OD, 16.5 OS`, `15,5 beidseits`) and diurnal timestamps (`IOP @ 10:15: 14 OD, 16 OS mmHg`).
      - Extracts patient posture (`sitting`, `supine`) e.g., `IOP (PAT, supine): 14 OD, 15 OS mmHg`.
      - Extracts Tono-Pen reliability and confidence ratings (`5%`, `10%`, `>95%`, `<5%`) e.g., `IOP (Tono-Pen 5%): 15 OU mmHg`.
      - Parses Ocular Response Analyzer (`ORA`) and Pascal DCT biomechanical parameters: Goldmann-correlated IOP (`IOPg`), Corneal-compensated IOP (`IOPcc`, LOINC `96093-0` OD / `96092-2` OS), Corneal Hysteresis (`CH`), and Ocular Pulse Amplitude (`OPA`). Generates discrete monocular HL7 FHIR R4 Observations with discrete components and clinical notes under LOINC `55284-4` (_Intraocular pressure_).
@@ -317,6 +320,42 @@ A taught phrase can mark individual words as optional and can collect several ph
 Clinicians and scribes can also highlight un-normalized text directly within the **Clinical Spoken / Dictated Transcript** or **Live Stream** (when paused/stopped and not recording mic) to trigger a contextual floating action pill (`✨ Teach Phrase: "..."`) or a toolbar button that transfers the highlighted text into the rule inducer with automatic encounter locale synchronization.
 
 Both the `/training` rule workbench and the User Administration panel feature headless, sortable, paginated data grids powered by **TanStack Table (`@tanstack/react-table`)** with Redux-controlled state (zero `useState`), global multi-field search, finding-type category faceting, and batch selection.
+
+---
+
+## In-Process ONNX Residue Slot Model Fallback
+
+When clinicians dictate findings using non-standard or colloquial phrasings that deterministic grammars do not recognize (e.g., _"she reads down to the twenty thirty line in the right eye"_ or _"prefers minus two point five and a seventy five cyl at axis one eighty"_), OptoNorm escalates those unclaimed residue spans to an optional, in-process Small Language Model (SLM).
+
+### Zero-Hallucination Extractive Architecture
+
+- **Dual-Head MiniLM (`DualHeadMiniLM`)**: A lightweight token-tagger backbone (`microsoft/Multilingual-MiniLM-L12-H384`) equipped with:
+  1. A sentence-level finding type classifier (`visual_acuity`, `refraction`, `iop`, `abstain`).
+  2. A 29-class BIO sequence tagger (`O` + 14 `B-`/`I-` slot pairs for sphere, cylinder, axis, add, IOP, and laterality).
+- **Extractive Span Projection**: Numbers and slots are strictly extracted from source character offsets—the model never generates raw text numbers autoregressively.
+- **Triple Post-Hoc Safety Guards**:
+  1. **Numeric Entailment Guard**: Confirms every number, fraction, and magnitude in the proposed shorthand is entailed by source spoken numbers.
+  2. **Physiological Range Guard**: Enforces 0.25 D sphere/cylinder steps, 1–180° axes, 5–60 mmHg IOP, and locale acuity scales.
+  3. **Laterality Licensing Guard**: Enforces strict word-boundary matching on locale eye synonyms (`OD`, `OS`, `OU`). Rejects unlicensed laterality inventions with `model.rejected_laterality_guard`.
+- **Silent Discard**: Extended residue candidates that abstain or fail guards are silently dropped without sprouting false-positive review warnings in EHR notes.
+- **Dynamic Int8 ONNX Quantization**: Runs in under 15 ms on standard CPU cores via ONNX Runtime with zero GPU requirements.
+
+### Training & Corpus Tooling
+
+- **Corpus Builder**: `scripts/build_slm_corpus.py` generates training, validation, and test datasets (`data/slm/`) by extracting seed spans across 5 locales (`en`, `de`, `es`, `fr`, `it`), aligning slots back to spoken word spans, and generating realistic clinical paraphrases.
+- **Model Training & Quantization**: `scripts/train_slm.py` trains the dual-head MiniLM, exports dynamic-axes ONNX graphs, quantizes to Int8, and validates the acceptance gate on held-out test data.
+
+### CLI & Environment Configuration
+
+- **CLI Usage**:
+  ```bash
+  optonorm --slm-model models/residue_slm_int8.onnx --slm-tokenizer models/tokenizer.json "Exam: she reads down to the twenty thirty line in the right eye."
+  ```
+- **Environment Variables**:
+  ```bash
+  export OPTONORM_SLM_MODEL=/path/to/model_int8.onnx
+  export OPTONORM_SLM_TOKENIZER=/path/to/tokenizer.json
+  ```
 
 ---
 
