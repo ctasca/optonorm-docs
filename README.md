@@ -5,10 +5,10 @@
 # OptoNorm: High-Precision Optometric Clinical Shorthand Normalizer & FHIR R4 Exporter
 
 [![CI](https://img.shields.io/badge/CI-passing-brightgreen.svg)](https://github.com/ctasca/optonorm/actions)
-[![Version: 0.52.0](https://img.shields.io/badge/version-0.52.0-blue.svg)]()
+[![Version: 0.53.0](https://img.shields.io/badge/version-0.53.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-4446%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-4498%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -330,12 +330,12 @@ When clinicians dictate findings using non-standard or colloquial phrasings that
 ### Zero-Hallucination Extractive Architecture
 
 - **Dual-Head MiniLM (`DualHeadMiniLM`)**: A lightweight token-tagger backbone (`microsoft/Multilingual-MiniLM-L12-H384`) equipped with:
-  1. A sentence-level finding type classifier (`visual_acuity`, `refraction`, `iop`, `abstain`).
-  2. A 29-class BIO sequence tagger (`O` + 14 `B-`/`I-` slot pairs for sphere, cylinder, axis, add, IOP, and laterality).
+  1. A sentence-level finding type classifier supporting 10 clinical types (`visual_acuity`, `refraction`, `iop`, `cd_ratio`, `gonioscopy`, `perimetry`, `grading`, `oct`, `extraocular_motility`, `abstain`).
+  2. A 91-class BIO sequence tagger (`O` + 45 `B-`/`I-` slot pairs across refractive, IOP, glaucoma biometrics, anterior segment biomicroscopy/cataract/cornea, high-resolution OCT imaging, and extraocular motility sensorimotor alignment).
 - **Extractive Span Projection**: Numbers and slots are strictly extracted from source character offsets—the model never generates raw text numbers autoregressively.
 - **Triple Post-Hoc Safety Guards**:
   1. **Numeric Entailment Guard**: Confirms every number, fraction, and magnitude in the proposed shorthand is entailed by source spoken numbers.
-  2. **Physiological Range Guard**: Enforces 0.25 D sphere/cylinder steps, 1–180° axes, 5–60 mmHg IOP, and locale acuity scales.
+  2. **Physiological Range Guard**: Enforces 0.25 D sphere/cylinder steps, 1–180° axes, 5–60 mmHg IOP, 0.0–1.0 C/D ratios, Shaffer/Spaeth/Scheie angle boundaries, Humphrey field indices (-35 to +5 dB MD, 0–20 dB PSD), LOCS III cataract grades, SUN anterior chamber cells/flare, Van Herick angle depth (0–4), corneal SPK staining, CST (100–1000 µm), RNFL (20–250 µm), macular cube volume, motility status (EOMI/FROM), cardinal limitation grades ($-4$ to $+4$), and cranial nerve palsy validation (`III`, `IV`, `VI`).
   3. **Laterality Licensing Guard**: Enforces strict word-boundary matching on locale eye synonyms (`OD`, `OS`, `OU`). Rejects unlicensed laterality inventions with `model.rejected_laterality_guard`.
 - **Silent Discard**: Extended residue candidates that abstain or fail guards are silently dropped without sprouting false-positive review warnings in EHR notes.
 - **Dynamic Int8 ONNX Quantization**: Runs in under 15 ms on standard CPU cores via ONNX Runtime with zero GPU requirements.
