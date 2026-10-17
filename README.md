@@ -8,7 +8,7 @@
 [![Version: 0.53.0](https://img.shields.io/badge/version-0.53.0-blue.svg)]()
 [![Python 3.13](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/)
 [![Frontend: React 19](https://img.shields.io/badge/frontend-React%2019-61dafb.svg)]()
-[![Tests](https://img.shields.io/badge/tests-4498%20passed-brightgreen.svg)]()
+[![Tests](https://img.shields.io/badge/tests-4504%20passed-brightgreen.svg)]()
 [![Benchmark](https://img.shields.io/badge/gold%20benchmark-100%25-success.svg)]()
 
 [![Code style: ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
@@ -199,7 +199,7 @@ Instead of outputting verbose, generic prose (e.g., _"the patient's visual acuit
    - **Interactive Documentation**: Auto-generated Swagger UI (`/docs`) and ReDoc (`/redoc`) with pre-configured clinical examples across all supported languages.
 
 9. **Real-Time Streaming & Ambient Scribing (Chunked ASR)**:
-   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds and commits a finding only at a real sentence boundary (`.?!` or a newline) or on flush. Conjunctions (`and`, `et`, `e`, `y`, `und`) and fixed phrases stay pending, so a bilateral measurement or an optional phrase tail is normalized with the rest of the sentence. A pause holds an unfinished diopter (`"minus two"`), a partial axis after a power (`"at one"`), and an IOP cue that is still waiting for a number. Finished speech is committed, including `"blood pressure"`, `"looking at"`, and `"see you at ten"`.
+   - **Sliding Window Buffer (`StreamingNormalizerBuffer`)**: Handles live ASR chunk feeds and commits a finding only at a real sentence boundary (`.?!` or a newline) or on session flush. Conjunctions (`and`, `et`, `e`, `y`, `und`) and fixed phrases stay pending, so a bilateral measurement or an optional phrase tail is normalized with the rest of the sentence. A pause holds an unfinished diopter (`"minus two"`), a partial axis after a power (`"at one"`), an IOP cue that is still waiting for a number, a trailing refraction that can still receive cylinder, axis, or add, and a one-eye IOP, pachymetry, or TBUT that can still receive the other eye. On that pause, one `note_preview` event carries `normalize()` of the full raw transcript so the inspector matches the note Stop will reconcile. A finalized word does not rebuild the note by itself. An `interim_update` carries the same full-note `normalized_text` for an unconfirmed hypothesis. Finished speech is committed, including `"blood pressure"`, `"looking at"`, `"see you at ten"`, a both-eyes pressure in one phrase, and a one-eye visual acuity.
    - **Symmetrical Bilateral Holdback**: Automatically holds back uncommitted unilateral findings (IOP, Pachymetry, TBUT) across speech pauses, waiting for potential contralateral clauses before committing canonical binocular `OU` shorthand or monocular `OD`/`OS`.
    - **Bidirectional Offset Tracking (`OffsetTracker`)**: Maintains coordinate mappings between raw incoming ASR stream offsets and normalized shorthand indices across non-destructive span edits, allowing downstream UI components to map audio-aligned timestamps to transformed text.
    - **Zero-Latency Narrative Flushing**: Immediately emits conversational ambient prose outside clinical slots without buffering delays, preserving doctor-patient dialogue 100% verbatim.
@@ -1084,7 +1084,9 @@ Event types:
 - `finding_committed`: verified shorthand written into the note, with FHIR observations when the build succeeds.
 - `review_required`: a guard rejected the proposal. `emitted_text` is the proposed shorthand, `original_text` is the speech that stays in the note, and `flagged_for_review` is true. No FHIR observation is emitted for that span.
 - `error`: a committed finding's FHIR build failed. `error_message` explains the failure instead of returning a silent empty observation list.
-- `narrative_flush`, `interim_update`, and `session_end` cover verbatim speech, unconfirmed ASR hypotheses, and end of encounter.
+- `note_preview`: full normalized note, edits, alerts, and FHIR bundle while a span is still open. It does not end the session and does not lock the pending words.
+- `narrative_flush`, `interim_update`, and `session_end` cover verbatim speech, unconfirmed ASR hypotheses (with a full-note `normalized_text`), and end of encounter.
+- Browser checks for the live page and its WebSocket run with `make test-e2e`. The default `uv run pytest` skips them.
 
 #### 6. `GET /v1/normalize/sse`
 
